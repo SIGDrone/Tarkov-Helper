@@ -62,6 +62,9 @@ public sealed class UserDataDbService
 
         try
         {
+            // 백업 먼저 수행
+            await BackupDatabaseAsync();
+
             Directory.CreateDirectory(Path.GetDirectoryName(_databasePath)!);
 
             var connectionString = $"Data Source={_databasePath}";
@@ -84,9 +87,6 @@ public sealed class UserDataDbService
     {
         // First, check for schema migration to ProfileType system
         await MigrateToProfileSystemAsync(connection);
-        
-        // Ensure CustomMarkers has necessary columns
-        await MigrateCustomMarkersSchemaAsync(connection);
 
         var createTablesSql = @"
             -- 퀘스트 진행 상태
@@ -193,128 +193,136 @@ public sealed class UserDataDbService
 
     /// <summary>
     /// 기존 단일 프로필 시스템에서 PVP/PVE 통합 프로필 시스템으로 마이그레이션합니다.
+    /// SQLite는 ALTER TABLE로 PK를 변경할 수 없으므로 테이블 재생성 방식을 사용합니다.
     /// </summary>
     private async Task MigrateToProfileSystemAsync(SqliteConnection connection)
     {
-        var tablesToMigrate = new[] { "QuestProgress", "ObjectiveProgress", "ItemInventory", "HideoutProgress", "UserSettings", "CustomMapMarkers" };
-
-        foreach (var tableName in tablesToMigrate)
+        var tablesToMigrate = new Dictionary<string, string>
         {
+            { "QuestProgress", "Id, 0 as ProfileType, NormalizedName, Status, UpdatedAt" },
+            { "ObjectiveProgress", "Id, 0 as ProfileType, QuestId, IsCompleted, UpdatedAt" },
+            { "ItemInventory", "ItemNormalizedName, 0 as ProfileType, FirQuantity, NonFirQuantity, UpdatedAt" },
+            { "HideoutProgress", "StationId, 0 as ProfileType, Level, UpdatedAt" },
+            { "UserSettings", "Key, 0 as ProfileType, Value" },
+            { "CustomMapMarkers", "Id, 0 as ProfileType, MapKey, Name, X, Y, Z, FloorId, Color, Size, Opacity, CreatedAt" }
+        };
+
+        foreach (var entry in tablesToMigrate)
+        {
+            var tableName = entry.Key;
+            var columns = entry.Value;
+
             try
             {
-                // ProfileType 컬럼이 있는지 확인
-                var checkColumnSql = $"SELECT COUNT(*) FROM pragma_table_info('{tableName}') WHERE name='ProfileType'";
-                await using var checkCmd = new SqliteCommand(checkColumnSql, connection);
-                var hasProfileType = Convert.ToInt32(await checkCmd.ExecuteScalarAsync()) > 0;
+                // 테이블 존재 여부 확인
+                var checkTableSql = $"SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='{tableName}'";
+                await using var checkTableCmd = new SqliteCommand(checkTableSql, connection);
+                if (Convert.ToInt32(await checkTableCmd.ExecuteScalarAsync()) == 0) continue;
 
-                if (!hasProfileType)
+                // 이미 고유 PK(ProfileType 포함)가 설정되어 있는지 확인
+                var checkPkSql = $"SELECT COUNT(*) FROM pragma_table_info('{tableName}') WHERE pk > 0 AND name = 'ProfileType'";
+                await using var checkPkCmd = new SqliteCommand(checkPkSql, connection);
+                var hasProfileTypeInPk = Convert.ToInt32(await checkPkCmd.ExecuteScalarAsync()) > 0;
+
+                if (!hasProfileTypeInPk)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[UserDataDbService] Migrating {tableName} to Profile system...");
+                    System.Diagnostics.Debug.WriteLine($"[UserDataDbService] Reconstructing {tableName} for PVE/PVP PK change...");
+
+                    // 1. 기존 테이블 이름 변경
+                    var renameSql = $"ALTER TABLE {tableName} RENAME TO {tableName}_old";
+                    await using (var cmd = new SqliteCommand(renameSql, connection)) await cmd.ExecuteNonQueryAsync();
+
+                    // 2. 새 테이블 생성 (CreateTablesAsync가 나중에 호출되므로 여기서는 직접 명령 실행 대신 
+                    // CreateTablesAsync에서 사용할 SQL과 동일한 구조의 테이블을 미리 생성)
+                    await RecreateTableWithNewPkAsync(tableName, connection);
+
+                    // 3. 데이터 복사 (기존 데이터는 PVP인 0으로 매핑)
+                    // 필드 목록에 ProfileType 컬럼이 포함되어 있는지 확인 후 데이터 부어넣기
+                    var insertSql = $@"
+                        INSERT INTO {tableName} 
+                        SELECT * FROM (
+                            SELECT {columns} FROM {tableName}_old
+                        )";
                     
-                    // SQLite에서 PK가 포함된 컬럼 변경은 테이블 재생성이 가장 안전함
-                    // 여기서는 단순히 컬럼을 추가하고 기존 데이터를 PVP(0)로 설정하는 방식으로 진행 (이후 테이블 생성 SQL에서 IF NOT EXISTS로 커버)
-                    var addColumnSql = $"ALTER TABLE {tableName} ADD COLUMN ProfileType INTEGER NOT NULL DEFAULT 0";
-                    await using var addCmd = new SqliteCommand(addColumnSql, connection);
-                    await addCmd.ExecuteNonQueryAsync();
-                    
-                    System.Diagnostics.Debug.WriteLine($"[UserDataDbService] {tableName} migrated successfully");
+                    try {
+                        await using (var cmd = new SqliteCommand(insertSql, connection)) await cmd.ExecuteNonQueryAsync();
+                        // 4. 기존 테이블 삭제
+                        var dropSql = $"DROP TABLE {tableName}_old";
+                        await using (var cmd = new SqliteCommand(dropSql, connection)) await cmd.ExecuteNonQueryAsync();
+                        System.Diagnostics.Debug.WriteLine($"[UserDataDbService] {tableName} reconstruction success");
+                    } catch (Exception ex) {
+                        System.Diagnostics.Debug.WriteLine($"[UserDataDbService] {tableName} data copy failed: {ex.Message}. Rolling back rename...");
+                        var rollbackSql = $"ALTER TABLE {tableName}_old RENAME TO {tableName}";
+                        await using (var cmd = new SqliteCommand(rollbackSql, connection)) await cmd.ExecuteNonQueryAsync();
+                    }
                 }
             }
             catch (Exception ex)
             {
-                // 이미 존재하거나 테이블이 없는 경우 무시
-                System.Diagnostics.Debug.WriteLine($"[UserDataDbService] Migration warning for {tableName}: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[UserDataDbService] Migration failed for {tableName}: {ex.Message}");
             }
         }
     }
 
     /// <summary>
-    /// ItemInventory 테이블 스키마 마이그레이션 (오래된 스키마 수정)
+    /// 테이블별 새 스키마로 재생성
     /// </summary>
-    private async Task MigrateItemInventorySchemaAsync(SqliteConnection connection)
+    private async Task RecreateTableWithNewPkAsync(string tableName, SqliteConnection connection)
+    {
+        string sql = tableName switch
+        {
+            "QuestProgress" => @"
+                CREATE TABLE QuestProgress (
+                    Id TEXT, ProfileType INTEGER NOT NULL DEFAULT 0, NormalizedName TEXT, Status TEXT NOT NULL, UpdatedAt TEXT NOT NULL,
+                    PRIMARY KEY (Id, ProfileType))",
+            "ObjectiveProgress" => @"
+                CREATE TABLE ObjectiveProgress (
+                    Id TEXT, ProfileType INTEGER NOT NULL DEFAULT 0, QuestId TEXT, IsCompleted INTEGER NOT NULL DEFAULT 0, UpdatedAt TEXT NOT NULL,
+                    PRIMARY KEY (Id, ProfileType))",
+            "ItemInventory" => @"
+                CREATE TABLE ItemInventory (
+                    ItemNormalizedName TEXT, ProfileType INTEGER NOT NULL DEFAULT 0, FirQuantity INTEGER NOT NULL DEFAULT 0, NonFirQuantity INTEGER NOT NULL DEFAULT 0, UpdatedAt TEXT NOT NULL,
+                    PRIMARY KEY (ItemNormalizedName, ProfileType))",
+            "HideoutProgress" => @"
+                CREATE TABLE HideoutProgress (
+                    StationId TEXT, ProfileType INTEGER NOT NULL DEFAULT 0, Level INTEGER NOT NULL DEFAULT 0, UpdatedAt TEXT NOT NULL,
+                    PRIMARY KEY (StationId, ProfileType))",
+            "UserSettings" => @"
+                CREATE TABLE UserSettings (
+                    Key TEXT, ProfileType INTEGER NOT NULL DEFAULT 0, Value TEXT NOT NULL,
+                    PRIMARY KEY (Key, ProfileType))",
+            "CustomMapMarkers" => @"
+                CREATE TABLE CustomMapMarkers (
+                    Id TEXT, ProfileType INTEGER NOT NULL DEFAULT 0, MapKey TEXT NOT NULL, Name TEXT, X REAL NOT NULL, Y REAL NOT NULL, Z REAL NOT NULL, FloorId TEXT, Color TEXT, Size REAL NOT NULL DEFAULT 24.0, Opacity REAL NOT NULL DEFAULT 1.0, CreatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (Id, ProfileType))",
+            _ => throw new ArgumentException($"Unknown table: {tableName}")
+        };
+
+        if (!string.IsNullOrEmpty(sql))
+        {
+            await using var cmd = new SqliteCommand(sql, connection);
+            await cmd.ExecuteNonQueryAsync();
+        }
+    }
+
+    private async Task BackupDatabaseAsync()
     {
         try
         {
-            // Check if ItemInventory table exists
-            var checkTableSql = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='ItemInventory'";
-            await using var checkCmd = new SqliteCommand(checkTableSql, connection);
-            var tableExists = Convert.ToInt32(await checkCmd.ExecuteScalarAsync()) > 0;
-
-            if (!tableExists) return;
-
-            // Check if ItemNormalizedName column exists
-            var checkColumnSql = "SELECT COUNT(*) FROM pragma_table_info('ItemInventory') WHERE name='ItemNormalizedName'";
-            await using var checkColCmd = new SqliteCommand(checkColumnSql, connection);
-            var columnExists = Convert.ToInt32(await checkColCmd.ExecuteScalarAsync()) > 0;
-
-            if (!columnExists)
+            if (File.Exists(_databasePath))
             {
-                System.Diagnostics.Debug.WriteLine("[UserDataDbService] Migrating ItemInventory table schema...");
-
-                // Drop the old table and recreate with correct schema
-                var migrateSql = @"
-                    DROP TABLE IF EXISTS ItemInventory;
-                    CREATE TABLE ItemInventory (
-                        ItemNormalizedName TEXT PRIMARY KEY,
-                        FirQuantity INTEGER NOT NULL DEFAULT 0,
-                        NonFirQuantity INTEGER NOT NULL DEFAULT 0,
-                        UpdatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-                    );
-                ";
-                await using var migrateCmd = new SqliteCommand(migrateSql, connection);
-                await migrateCmd.ExecuteNonQueryAsync();
-
-                System.Diagnostics.Debug.WriteLine("[UserDataDbService] ItemInventory table migrated successfully");
+                var backupPath = _databasePath + ".bak";
+                File.Copy(_databasePath, backupPath, true);
+                System.Diagnostics.Debug.WriteLine($"[UserDataDbService] Database backup created: {backupPath}");
             }
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[UserDataDbService] ItemInventory schema migration failed: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"[UserDataDbService] Backup failed: {ex.Message}");
         }
     }
 
-    private async Task MigrateCustomMarkersSchemaAsync(SqliteConnection connection)
-    {
-        try
-        {
-            var checkTableSql = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='CustomMapMarkers'";
-            await using var checkCmd = new SqliteCommand(checkTableSql, connection);
-            var tableExists = Convert.ToInt32(await checkCmd.ExecuteScalarAsync()) > 0;
 
-            if (!tableExists) return;
-
-            var checkColumnSql = "SELECT COUNT(*) FROM pragma_table_info('CustomMapMarkers') WHERE name='Size'";
-            await using var checkColCmd = new SqliteCommand(checkColumnSql, connection);
-            var columnExists = Convert.ToInt32(await checkColCmd.ExecuteScalarAsync()) > 0;
-
-            if (!columnExists)
-            {
-                System.Diagnostics.Debug.WriteLine("[UserDataDbService] Adding 'Size' column to CustomMapMarkers table...");
-                var migrateSql = "ALTER TABLE CustomMapMarkers ADD COLUMN Size REAL NOT NULL DEFAULT 24.0";
-                await using var migrateCmd = new SqliteCommand(migrateSql, connection);
-                await migrateCmd.ExecuteNonQueryAsync();
-                System.Diagnostics.Debug.WriteLine("[UserDataDbService] CustomMapMarkers table migrated successfully (Size)");
-            }
-
-            // Check for 'Opacity' column
-            var checkOpacitySql = "SELECT COUNT(*) FROM pragma_table_info('CustomMapMarkers') WHERE name='Opacity'";
-            await using var checkOpCmd = new SqliteCommand(checkOpacitySql, connection);
-            var opacityExists = Convert.ToInt32(await checkOpCmd.ExecuteScalarAsync()) > 0;
-
-            if (!opacityExists)
-            {
-                System.Diagnostics.Debug.WriteLine("[UserDataDbService] Adding 'Opacity' column to CustomMapMarkers table...");
-                var migrateSql = "ALTER TABLE CustomMapMarkers ADD COLUMN Opacity REAL NOT NULL DEFAULT 1.0";
-                await using var migrateCmd = new SqliteCommand(migrateSql, connection);
-                await migrateCmd.ExecuteNonQueryAsync();
-                System.Diagnostics.Debug.WriteLine("[UserDataDbService] CustomMapMarkers table migrated successfully (Opacity)");
-            }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"[UserDataDbService] CustomMapMarkers schema migration failed: {ex.Message}");
-        }
-    }
 
     #region Quest Progress
 
@@ -1201,58 +1209,6 @@ public sealed class UserDataDbService
         cmd.Parameters.AddWithValue("@value", value);
 
         cmd.ExecuteNonQuery();
-    }
-
-    #endregion
-
-    #region Batch Operations
-
-    /// <summary>
-    /// 여러 퀘스트 진행 상태를 일괄 저장
-    /// </summary>
-    public async Task SaveQuestProgressBatchAsync(Dictionary<string, QuestStatus> progress,
-        Func<string, string?>? getNormalizedName = null)
-    {
-        await InitializeAsync();
-        var profileType = ProfileService.Instance.CurrentProfile;
-
-        var connectionString = $"Data Source={_databasePath}";
-        await using var connection = new SqliteConnection(connectionString);
-        await connection.OpenAsync();
-
-        await using var transaction = await connection.BeginTransactionAsync();
-
-        try
-        {
-            var sql = @"
-                INSERT INTO QuestProgress (Id, ProfileType, NormalizedName, Status, UpdatedAt)
-                VALUES (@id, @profileType, @normalizedName, @status, @updatedAt)
-                ON CONFLICT(Id, ProfileType) DO UPDATE SET
-                    NormalizedName = @normalizedName,
-                    Status = @status,
-                    UpdatedAt = @updatedAt";
-
-            foreach (var kvp in progress)
-            {
-                await using var cmd = new SqliteCommand(sql, connection, (SqliteTransaction)transaction);
-                var normalizedName = getNormalizedName?.Invoke(kvp.Key) ?? kvp.Key;
-
-                cmd.Parameters.AddWithValue("@id", kvp.Key);
-                cmd.Parameters.AddWithValue("@profileType", (int)profileType);
-                cmd.Parameters.AddWithValue("@normalizedName", normalizedName);
-                cmd.Parameters.AddWithValue("@status", kvp.Value.ToString());
-                cmd.Parameters.AddWithValue("@updatedAt", DateTime.UtcNow.ToString("o"));
-
-                await cmd.ExecuteNonQueryAsync();
-            }
-
-            await transaction.CommitAsync();
-        }
-        catch
-        {
-            await transaction.RollbackAsync();
-            throw;
-        }
     }
 
     #endregion

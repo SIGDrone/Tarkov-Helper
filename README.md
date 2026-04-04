@@ -30,6 +30,16 @@ Escape from Tarkov 퀘스트 및 은신처 진행 상황을 추적하는 Windows
 - 메인 인터페이스에서 클릭 한 번으로 모드 전환
 - 각 모드별 독립적인 퀘스트 진행도, 창고, 은신처 상태 관리
 
+### 지도 및 위치 추적
+- 게임 내 스크린샷(PrintScreen)을 통한 실시간 위치 추적 및 표시
+- 레이드 시작 시 해당 맵으로 자동 전환 기능
+- 퀘스트 목표 지점 및 상세 정보 마커 표시
+- 탈출구(PMC, Scav, Transit) 위치 및 조건 표시
+- 주요 마커 오버레이 (PMC 스폰, 보스, 로그, 컬티스트, 레버 등)
+- 사용자 정의 커스텀 마커 추가 및 관리
+- 고도(Y축) 기반 자동 층(Floor) 전환 시스템
+- 게임 화면 위 오버레이 미니맵 지원
+
 ### 게임 로그 모니터링
 - 게임 로그에서 퀘스트 완료 자동 감지
 - BSG 런처 및 Steam 버전 모두 지원
@@ -37,14 +47,13 @@ Escape from Tarkov 퀘스트 및 은신처 진행 상황을 추적하는 Windows
 
 ### 한국어 인터페이스 최적화
 - 한국어 사용자 커뮤니티에 최적화된 인터페이스 제공
-- 모든 기능 및 위키 링크의 완벽한 한글화
+- 모든 기능의 완벽한 한글화
 
 ## 스크린샷
 
-<!-- 스크린샷 추가 예정 -->
-![퀘스트 목록](screenshots/quests_ko.png)
-![은신처](screenshots/hideout_ko.png)
-![필요 아이템](screenshots/items_ko.png)
+![퀘스트 목록](screenshots/quest.png)
+![지도 추적](screenshots/map.png)
+![은신처 관리](screenshots/hideout.png)
 
 ## 설치 방법
 
@@ -55,26 +64,13 @@ Escape from Tarkov 퀘스트 및 은신처 진행 상황을 추적하는 Windows
 ### 릴리즈 다운로드
 [Releases](../../releases) 페이지에서 최신 버전을 다운로드하세요.
 
-### 소스에서 빌드
-```bash
-# 저장소 클론
-git clone https://github.com/Zeliper/Tarkov-Item-Helper.git
-cd Tarkov-Item-Helper
-
-# 빌드 및 실행
-dotnet build -c Release
-dotnet run -c Release
-```
-
 ## 사용 방법
 
 ### 데이터 업데이트
 앱을 처음 실행하면 [tarkov.dev](https://tarkov.dev) API에서 최신 퀘스트, 아이템, 은신처 데이터를 자동으로 가져옵니다.
 
 수동으로 데이터를 업데이트하려면:
-```bash
-dotnet run -- --fetch
-```
+**설정** 탭에서 API 데이터 업데이트 **클릭**
 
 ### 퀘스트 추적
 1. **퀘스트** 탭에서 퀘스트 목록 확인
@@ -94,6 +90,13 @@ dotnet run -- --fetch
 
 ### 게임 로그 연동
 게임 설치 폴더를 자동 감지하여 퀘스트 완료 시 알림을 받을 수 있습니다.
+
+### 지도 기능 활용
+1. **지도** 탭에서 현재 플레이 중인 맵을 선택하거나, 로그 연동을 통해 자동으로 전환합니다.
+2. 게임 설정에서 `PrintScreen` 키를 누르면 플레이어의 실시간 위치가 지도 위에 표시됩니다.
+3. 퀘스트 목표와 탈출구 위치를 마커로 확인하세요.
+4. 마우스 우클릭으로 지점 정보를 확인하고 커스텀 마커를 추가할 수 있습니다.
+5. 건물의 다른 층을 보려면 `NumPad` 키나 인터페이스의 층 선택기를 사용하세요.
 
 ## 기술 스택
 
