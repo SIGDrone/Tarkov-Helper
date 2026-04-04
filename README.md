@@ -1,121 +1,120 @@
 # TarkovHelper
 
-[![en](https://img.shields.io/badge/lang-English-blue.svg)](README.md)
 [![ko](https://img.shields.io/badge/lang-한국어-red.svg)](README_KR.md)
-[![ja](https://img.shields.io/badge/lang-日本語-green.svg)](README_JA.md)
 
-<a href="https://buymeacoffee.com/zeliperstap" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="30"></a>
+Escape from Tarkov 퀘스트 및 은신처 진행 상황을 추적하는 Windows 데스크톱 애플리케이션입니다.
 
-A Windows desktop application for tracking Escape from Tarkov quest and hideout progress.
+## 주요 기능
 
-## Key Features
+### 퀘스트 관리
+- 모든 퀘스트 목록 조회 및 검색
+- 퀘스트 완료/진행중 상태 추적
+- 선행 퀘스트 및 후속 퀘스트 표시
+- 퀘스트 시작 시 선행 퀘스트 자동 완료 처리
+- 퀘스트 위키 링크 연결
 
-Tarkov 1.0 Fully accepted
+### 은신처 관리
+- 은신처 시설별 건설 레벨 추적
+- 각 레벨 업그레이드에 필요한 아이템 표시
+- 필요 트레이더, 스킬, 의존 시설 정보 제공
 
-### Quest Management
-- View and search all quests
-- Track quest completion/in-progress status
-- Display prerequisite and follow-up quests
-- Automatically mark prerequisite quests as complete when starting a quest
-- Link to quest wiki pages
+### 필요 아이템 추적
+- 진행중인 퀘스트에 필요한 아이템 집계
+- 은신처 건설에 필요한 아이템 집계
+- 일반 아이템과 FIR(Found in Raid) 아이템 구분 추적
+- 보유 수량 및 남은 필요 수량 계산
+- 아이템 위키 링크 및 아이콘 표시
 
-### Hideout Management
-- Track construction levels for each hideout station
-- Display required items for each level upgrade
-- Provide trader, skill, and dependent station requirements
+### PVE/PVP 모드 독립 관리
+- PVE와 PVP 프로필 데이터의 완전한 분리 추적
+- 메인 인터페이스에서 클릭 한 번으로 모드 전환
+- 각 모드별 독립적인 퀘스트 진행도, 창고, 은신처 상태 관리
 
-### Required Items Tracking
-- Aggregate items needed for in-progress quests
-- Aggregate items needed for hideout construction
-- Separate tracking for regular items and FIR (Found in Raid) items
-- Calculate owned quantity and remaining required quantity
-- Display item wiki links and icons
+### 게임 로그 모니터링
+- 게임 로그에서 퀘스트 완료 자동 감지
+- BSG 런처 및 Steam 버전 모두 지원
+- 게임 설치 폴더 자동 탐지
 
-### Game Log Monitoring
-- Automatically detect quest completion from game logs
-- Support for both BSG Launcher and Steam versions
-- Auto-detect game installation folder
+### 한국어 인터페이스 최적화
+- 한국어 사용자 커뮤니티에 최적화된 인터페이스 제공
+- 모든 기능 및 위키 링크의 완벽한 한글화
 
-### Multi-language Support
-- English / Korean / Japanese support
-- Real-time language switching
+## 스크린샷
 
-## Screenshots
+<!-- 스크린샷 추가 예정 -->
+![퀘스트 목록](screenshots/quests_ko.png)
+![은신처](screenshots/hideout_ko.png)
+![필요 아이템](screenshots/items_ko.png)
 
-<!-- Screenshots coming soon -->
-![Quest List](screenshots/quests.png)
-![Hideout](screenshots/hideout.png)
-![Required Items](screenshots/items.png)
+## 설치 방법
 
-## Installation
-
-### Requirements
+### 요구 사항
 - Windows OS
 - [.NET 8.0 Runtime](https://dotnet.microsoft.com/download/dotnet/8.0)
 
-### Download Release
-Download the latest version from the [Releases](../../releases) page.
+### 릴리즈 다운로드
+[Releases](../../releases) 페이지에서 최신 버전을 다운로드하세요.
 
-### Build from Source
+### 소스에서 빌드
 ```bash
-# Clone repository
+# 저장소 클론
 git clone https://github.com/Zeliper/Tarkov-Item-Helper.git
 cd Tarkov-Item-Helper
 
-# Build and run
+# 빌드 및 실행
 dotnet build -c Release
 dotnet run -c Release
 ```
 
-## Usage
+## 사용 방법
 
-### Data Update
-When you first run the app, it automatically fetches the latest quest, item, and hideout data from the [tarkov.dev](https://tarkov.dev) API.
+### 데이터 업데이트
+앱을 처음 실행하면 [tarkov.dev](https://tarkov.dev) API에서 최신 퀘스트, 아이템, 은신처 데이터를 자동으로 가져옵니다.
 
-To manually update data:
+수동으로 데이터를 업데이트하려면:
 ```bash
 dotnet run -- --fetch
 ```
 
-### Quest Tracking
-1. Check quest list in the **Quests** tab
-2. Mark completion status with checkboxes
-3. Search quests using the search bar
-4. Click on a quest to view details and prerequisite/follow-up quests
+### 퀘스트 추적
+1. **퀘스트** 탭에서 퀘스트 목록 확인
+2. 체크박스로 완료 상태 표시
+3. 검색창으로 퀘스트 검색
+4. 퀘스트 클릭 시 상세 정보 및 선행/후속 퀘스트 확인
 
-### Hideout Tracking
-1. Check station list in the **Hideout** tab
-2. Set the current level for each station
-3. View required items for the next level upgrade
+### 은신처 추적
+1. **은신처** 탭에서 시설 목록 확인
+2. 각 시설의 현재 레벨 설정
+3. 다음 레벨 업그레이드에 필요한 아이템 확인
 
-### Required Items
-1. Check all required items in the **Required Items** tab
-2. Track progress by entering owned quantities
-3. FIR items are managed separately
+### 필요 아이템 확인
+1. **필요 아이템** 탭에서 전체 필요 아이템 확인
+2. 보유 수량 입력으로 진행 상황 추적
+3. FIR 아이템은 별도로 관리
 
-### Game Log Integration
-The app auto-detects your game installation folder to provide notifications when quests are completed.
+### 게임 로그 연동
+게임 설치 폴더를 자동 감지하여 퀘스트 완료 시 알림을 받을 수 있습니다.
 
-## Tech Stack
+## 기술 스택
 
-- **Framework**: .NET 8.0, WPF
-- **Language**: C# 13
+- **프레임워크**: .NET 8.0, WPF
+- **언어**: C# 13
 - **API**: [tarkov.dev GraphQL API](https://tarkov.dev)
 
-## Data Storage Location
+## 데이터 저장 위치
 
-All data is stored in the `Data/` folder:
-- `tasks.json` - Quest data
-- `items.json` - Item data
-- `hideouts.json` - Hideout data
-- `progress.json` - User progress
-- `settings.json` - Language settings
+모든 데이터는 `Data/` 폴더에 저장됩니다:
+- `user_data.db` - **SQLite 데이터베이스**: PVE/PVP 통합 사용자 진행 상황(진행도, 아이템 등) 저장
+- `tasks.json` - API에서 받은 퀘스트 데이터 캐시
+- `items.json` - API에서 받은 아이템 데이터 캐시
+- `hideouts.json` - API에서 받은 은신처 데이터 캐시
+- `app_settings.json` - 앱 설정 및 사용자 환경 설정
 
-## License
+## 라이선스
 
 MIT License
 
-## Credits
+## 크레딧
 
-- Game data: [tarkov.dev](https://tarkov.dev)
-- Escape from Tarkov is a trademark of Battlestate Games.
+- 게임 데이터: [tarkov.dev](https://tarkov.dev)
+- Escape from Tarkov는 Battlestate Games의 상표입니다.
