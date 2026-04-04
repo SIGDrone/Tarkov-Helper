@@ -9,9 +9,7 @@ namespace TarkovHelper.Services;
 /// </summary>
 public enum AppLanguage
 {
-    EN,
-    KO,
-    JA
+    KO
 }
 
 /// <summary>
@@ -26,27 +24,13 @@ public partial class LocalizationService : INotifyPropertyChanged
     private readonly UserDataDbService _userDataDb = UserDataDbService.Instance;
     private const string KeyLanguage = "app.language";
 
-    private AppLanguage _currentLanguage = AppLanguage.EN;
+    private const AppLanguage _currentLanguage = AppLanguage.KO;
 
     public LocalizationService()
     {
-        LoadSettings();
     }
 
-    public AppLanguage CurrentLanguage
-    {
-        get => _currentLanguage;
-        set
-        {
-            if (_currentLanguage != value)
-            {
-                _currentLanguage = value;
-                OnPropertyChanged(nameof(CurrentLanguage));
-                LanguageChanged?.Invoke(this, value);
-                SaveSettings();
-            }
-        }
-    }
+    public AppLanguage CurrentLanguage => _currentLanguage;
 
     public event PropertyChangedEventHandler? PropertyChanged;
     public event EventHandler<AppLanguage>? LanguageChanged;
@@ -56,269 +40,115 @@ public partial class LocalizationService : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
-    #region Settings Persistence
+    #region Settings Persistence (Deprecated - Always KO)
 
-    private void SaveSettings()
-    {
-        try
-        {
-            _userDataDb.SetSetting(KeyLanguage, _currentLanguage.ToString());
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"[LocalizationService] Save failed: {ex.Message}");
-        }
-    }
-
-    private void LoadSettings()
-    {
-        try
-        {
-            // First check if JSON migration is needed
-            MigrateFromJsonIfNeeded();
-
-            // Load from DB
-            var langStr = _userDataDb.GetSetting(KeyLanguage);
-            if (!string.IsNullOrEmpty(langStr) && Enum.TryParse<AppLanguage>(langStr, out var lang))
-            {
-                _currentLanguage = lang;
-            }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"[LocalizationService] Load failed: {ex.Message}");
-            _currentLanguage = AppLanguage.EN;
-        }
-    }
-
-    /// <summary>
-    /// Migrate from legacy settings.json if it exists
-    /// </summary>
-    private void MigrateFromJsonIfNeeded()
-    {
-        // Check old Data/settings.json path
-        var dataDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data");
-        var jsonPath = Path.Combine(dataDir, "settings.json");
-
-        if (!File.Exists(jsonPath)) return;
-
-        try
-        {
-            var json = File.ReadAllText(jsonPath);
-            var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
-            var settings = JsonSerializer.Deserialize<LegacySettings>(json, options);
-
-            if (settings != null && Enum.TryParse<AppLanguage>(settings.Language, out var lang))
-            {
-                _userDataDb.SetSetting(KeyLanguage, lang.ToString());
-            }
-
-            // Delete the JSON file after migration
-            File.Delete(jsonPath);
-            System.Diagnostics.Debug.WriteLine($"[LocalizationService] Migrated and deleted: {jsonPath}");
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"[LocalizationService] Migration failed: {ex.Message}");
-        }
-    }
-
-    private class LegacySettings
-    {
-        public string Language { get; set; } = "EN";
-    }
+    private void SaveSettings() { }
+    private void LoadSettings() { }
+    private void MigrateFromJsonIfNeeded() { }
 
     #endregion
 
     #region Common UI Strings
 
-    public string Welcome => CurrentLanguage switch
+    public string Welcome => "Tarkov Helper에 오신 것을 환영합니다";
+    public string Cancel => "취소";
+    public string Apply => "적용";
+    public string Close => "닫기";
+    public string Settings => "설정";
+    public string Browse => "찾아보기";
+    public string Open => "열기";
+    public string Start => "시작";
+    public string Stop => "중지";
+    public string Reset => "리셋";
+    public string ResetAll => "초기화";
+    public string SelectAll => "전체 선택";
+    public string DeselectAll => "전체 해제";
+    public string ShowAll => "전체 표시";
+    public string HideAll => "전체 숨기기";
+    public string ExpandAll => "전체 펼치기";
+    public string CollapseAll => "전체 접기";
+    public string ShowMore => "더 보기";
+    public string ShowLess => "접기";
+    public string FilterAll => "전체";
+    public string Folder => "폴더";
+    public string Waiting => "대기 중";
+    public string Tracking => "추적 중";
+    public string AutoDetect => "자동 감지";
+    public string Automation => "자동화";
+    public string Layers => "레이어";
+    public string Legend => "범례";
+
+    // Newly added for MainWindow and Settings
+    public string Quests => "퀘스트";
+    public string Hideout => "은신처";
+    public string Items => "아이템";
+    public string Collector => "수집가 - 카파";
+    public string Map => "지도";
+    public string Profile => "프로필";
+    public string PlayerLevel => "플레이어 레벨";
+    public string ScavRep => "스캐브 평판";
+    public string DspDecode => "DSP 디코드 횟수";
+    public string Edition => "에디션";
+    public string PrestigeLevel => "프레스티지 레벨";
+    public string LoadingData => "데이터 로딩 중...";
+    public string Initializing => "초기화 중...";
+    public string LogFolder => "Tarkov 로그 폴더";
+    public string QuestLogSync => "퀘스트 로그 동기화";
+    public string CacheManagement => "캐시 관리";
+    public string FontSize => "글꼴 크기";
+    public string DataMigration => "데이터 가져오기";
+    public string Unknown => "알 수 없음";
+    public string UpdateApiData => "API 데이터 업데이트";
+    public string ApiUpdateCheck => "업데이트 확인 중...";
+    public string ApiUpdateSuccess => "성공적으로 업데이트되었습니다.";
+    public string ApiUpdateFail => "업데이트 실패: {0}";
+    public string ApiUpToDate => "이미 최신 버전입니다.";
+
+    // Items Page Stats
+    public string ItemsShowing => "아이템 {0}개 표시 중";
+
+    // Map Page
+    public string MapNoMapImage => "사용 가능한 지도 이미지가 없습니다";
+    public string MapAddMapImageHint => "Assets/Maps/ 폴더에 이미지를 추가하세요";
+    public string MapSetImagePathHint => "또는 설정에서 경로를 지정하세요";
+
+    #endregion
+
+    #region Common Name Localization (Trader, Map)
+
+    public string GetLocalizedTraderName(string? englishName) => englishName?.ToLowerInvariant() switch
     {
-        AppLanguage.KO => "Tarkov Helper에 오신 것을 환영합니다",
-        AppLanguage.JA => "Tarkov Helperへようこそ",
-        _ => "Welcome to Tarkov Helper"
+        "prapor" => "프라포",
+        "therapist" => "테라피스트",
+        "skier" => "스키어",
+        "peacekeeper" => "피스키퍼",
+        "mechanic" => "메카닉",
+        "ragman" => "래그맨",
+        "jaeger" => "예거",
+        "fence" => "펜스",
+        "lightkeeper" => "등대지기",
+        "ref" => "레프",
+        "arena" => "아레나",
+        "the labyrinth" => "미궁",
+        "btr driver" => "BTR 운전수",
+        _ => englishName ?? Unknown
     };
 
-    public string Cancel => CurrentLanguage switch
+    public string GetLocalizedMapName(string? englishName) => englishName?.ToLowerInvariant().Replace("-", " ") switch
     {
-        AppLanguage.KO => "취소",
-        AppLanguage.JA => "キャンセル",
-        _ => "Cancel"
-    };
-
-    public string Apply => CurrentLanguage switch
-    {
-        AppLanguage.KO => "적용",
-        AppLanguage.JA => "適用",
-        _ => "Apply"
-    };
-
-    public string Close => CurrentLanguage switch
-    {
-        AppLanguage.KO => "닫기",
-        AppLanguage.JA => "閉じる",
-        _ => "Close"
-    };
-
-    public string Settings => CurrentLanguage switch
-    {
-        AppLanguage.KO => "설정",
-        AppLanguage.JA => "設定",
-        _ => "Settings"
-    };
-
-    public string Browse => CurrentLanguage switch
-    {
-        AppLanguage.KO => "찾아보기",
-        AppLanguage.JA => "参照",
-        _ => "Browse"
-    };
-
-    public string Open => CurrentLanguage switch
-    {
-        AppLanguage.KO => "열기",
-        AppLanguage.JA => "開く",
-        _ => "Open"
-    };
-
-    public string Start => CurrentLanguage switch
-    {
-        AppLanguage.KO => "시작",
-        AppLanguage.JA => "開始",
-        _ => "Start"
-    };
-
-    public string Stop => CurrentLanguage switch
-    {
-        AppLanguage.KO => "중지",
-        AppLanguage.JA => "停止",
-        _ => "Stop"
-    };
-
-    public string Reset => CurrentLanguage switch
-    {
-        AppLanguage.KO => "리셋",
-        AppLanguage.JA => "リセット",
-        _ => "Reset"
-    };
-
-    public string ResetAll => CurrentLanguage switch
-    {
-        AppLanguage.KO => "초기화",
-        AppLanguage.JA => "リセット",
-        _ => "Reset"
-    };
-
-    public string SelectAll => CurrentLanguage switch
-    {
-        AppLanguage.KO => "전체 선택",
-        AppLanguage.JA => "すべて選択",
-        _ => "Select All"
-    };
-
-    public string DeselectAll => CurrentLanguage switch
-    {
-        AppLanguage.KO => "전체 해제",
-        AppLanguage.JA => "すべて解除",
-        _ => "Deselect All"
-    };
-
-    public string ShowAll => CurrentLanguage switch
-    {
-        AppLanguage.KO => "전체 표시",
-        AppLanguage.JA => "すべて表示",
-        _ => "Show All"
-    };
-
-    public string HideAll => CurrentLanguage switch
-    {
-        AppLanguage.KO => "전체 숨기기",
-        AppLanguage.JA => "すべて非表示",
-        _ => "Hide All"
-    };
-
-    public string ExpandAll => CurrentLanguage switch
-    {
-        AppLanguage.KO => "전체 펼치기",
-        AppLanguage.JA => "すべて展開",
-        _ => "Expand All"
-    };
-
-    public string CollapseAll => CurrentLanguage switch
-    {
-        AppLanguage.KO => "전체 접기",
-        AppLanguage.JA => "すべて折りたたむ",
-        _ => "Collapse All"
-    };
-
-    public string ShowMore => CurrentLanguage switch
-    {
-        AppLanguage.KO => "더 보기",
-        AppLanguage.JA => "もっと見る",
-        _ => "Show More"
-    };
-
-    public string ShowLess => CurrentLanguage switch
-    {
-        AppLanguage.KO => "접기",
-        AppLanguage.JA => "閉じる",
-        _ => "Show Less"
-    };
-
-    public string FilterAll => CurrentLanguage switch
-    {
-        AppLanguage.KO => "전체",
-        AppLanguage.JA => "全て",
-        _ => "All"
-    };
-
-    public string Folder => CurrentLanguage switch
-    {
-        AppLanguage.KO => "폴더",
-        AppLanguage.JA => "フォルダ",
-        _ => "Folder"
-    };
-
-    public string Waiting => CurrentLanguage switch
-    {
-        AppLanguage.KO => "대기 중",
-        AppLanguage.JA => "待機中",
-        _ => "Waiting"
-    };
-
-    public string Tracking => CurrentLanguage switch
-    {
-        AppLanguage.KO => "추적 중",
-        AppLanguage.JA => "追跡中",
-        _ => "Tracking"
-    };
-
-    public string AutoDetect => CurrentLanguage switch
-    {
-        AppLanguage.KO => "자동 감지",
-        AppLanguage.JA => "自動検出",
-        _ => "Auto Detect"
-    };
-
-    public string Automation => CurrentLanguage switch
-    {
-        AppLanguage.KO => "자동화",
-        AppLanguage.JA => "自動化",
-        _ => "Automation"
-    };
-
-    public string Layers => CurrentLanguage switch
-    {
-        AppLanguage.KO => "레이어",
-        AppLanguage.JA => "レイヤー",
-        _ => "Layers"
-    };
-
-    public string Legend => CurrentLanguage switch
-    {
-        AppLanguage.KO => "범례",
-        AppLanguage.JA => "凡例",
-        _ => "Legend"
+        "customs" => "세관",
+        "factory" => "공장",
+        "interchange" => "인터체인지",
+        "reserve" => "리저브",
+        "shoreline" => "해안선",
+        "woods" => "삼림",
+        "lighthouse" => "등대",
+        "streets" or "streets of tarkov" or "streetsoftarkov" => "타르코프 시내",
+        "ground zero" or "groundzero" => "그라운드 제로",
+        "the lab" or "the labs" or "labs" => "연구소",
+        "the labyrinth" or "labyrinth" => "미궁",
+        "arena" => "아레나",
+        _ => englishName ?? Unknown
     };
 
     #endregion

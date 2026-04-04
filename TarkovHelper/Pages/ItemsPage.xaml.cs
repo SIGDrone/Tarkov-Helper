@@ -15,6 +15,7 @@ namespace TarkovHelper.Pages
         private readonly HideoutProgressService _hideoutProgressService = HideoutProgressService.Instance;
         private readonly ItemInventoryService _inventoryService = ItemInventoryService.Instance;
         private readonly ImageCacheService _imageCache = ImageCacheService.Instance;
+        private readonly ItemsDataService _itemsDataService = ItemsDataService.Instance;
         private List<AggregatedItemViewModel> _allItemViewModels = new();
         private Dictionary<string, TarkovItem>? _itemLookup;
         private HashSet<string> _allCategories = new(StringComparer.OrdinalIgnoreCase);
@@ -24,132 +25,6 @@ namespace TarkovHelper.Pages
         private bool _needsRefreshOnLoad = false; // Flag to indicate data refresh needed after unload
         private string? _pendingItemSelection = null;
 
-        // Currency items should count by reference count, not total amount
-        private static readonly HashSet<string> CurrencyItems = new(StringComparer.OrdinalIgnoreCase)
-        {
-            "roubles", "dollars", "euros"
-        };
-
-        private static bool IsCurrency(string normalizedName) => CurrencyItems.Contains(normalizedName);
-
-        // Category grouping: map detailed categories to broader parent categories
-        private static readonly Dictionary<string, string> CategoryMapping = new(StringComparer.OrdinalIgnoreCase)
-        {
-            // Provisions (Food & Drinks)
-            { "Food", "Provisions" },
-            { "Drinks", "Provisions" },
-
-            // Medical
-            { "Medkits", "Medical" },
-            { "Medical supplies", "Medical" },
-            { "Injury treatment", "Medical" },
-            { "Stimulants", "Medical" },
-            { "Drugs", "Medical" },
-
-            // Gear
-            { "Armor vests", "Gear" },
-            { "Armor plates", "Gear" },
-            { "Chest rigs", "Gear" },
-            { "Backpacks", "Gear" },
-            { "Headwear", "Gear" },
-            { "Eyewear", "Gear" },
-            { "Face cover", "Gear" },
-            { "Earpieces", "Gear" },
-            { "Armbands", "Gear" },
-            { "Special equipment", "Gear" },
-
-            // Barter items
-            { "Electronics", "Barter" },
-            { "Building materials", "Barter" },
-            { "Flammable materials", "Barter" },
-            { "Energy elements", "Barter" },
-            { "Household goods", "Barter" },
-            { "Tools", "Barter" },
-            { "Valuables", "Barter" },
-            { "Other", "Barter" },
-
-            // Info & Keys
-            { "Info items", "Info & Keys" },
-            { "Keys", "Info & Keys" },
-            { "Keycards", "Info & Keys" },
-            { "Maps", "Info & Keys" },
-            { "Extraction intel", "Info & Keys" },
-
-            // Containers
-            { "Containers & cases", "Containers" },
-            { "Secure containers", "Containers" },
-
-            // Money
-            { "Money", "Money" },
-
-            // Ammo
-            { "Rounds", "Ammo" },
-            { "Ammo boxes", "Ammo" },
-            { "Shrapnel", "Ammo" },
-
-            // Weapon mods
-            { "Mounts", "Weapon Mods" },
-            { "Stocks & chassis", "Weapon Mods" },
-            { "Handguards", "Weapon Mods" },
-            { "Barrels", "Weapon Mods" },
-            { "Magazines", "Weapon Mods" },
-            { "Flash hiders & muzzle brakes", "Weapon Mods" },
-            { "Suppressors", "Weapon Mods" },
-            { "Muzzle adapters", "Weapon Mods" },
-            { "Iron sights", "Weapon Mods" },
-            { "Pistol grips", "Weapon Mods" },
-            { "Receivers and slides", "Weapon Mods" },
-            { "Charging handles", "Weapon Mods" },
-            { "Gas blocks", "Weapon Mods" },
-            { "Foregrips", "Weapon Mods" },
-            { "Auxiliary parts", "Weapon Mods" },
-            { "Bipods", "Weapon Mods" },
-            { "Underbarrel grenade launchers", "Weapon Mods" },
-
-            // Optics
-            { "Scopes", "Optics" },
-            { "Assault scopes", "Optics" },
-            { "Reflex sights", "Optics" },
-            { "Compact reflex sights", "Optics" },
-            { "Night vision scopes", "Optics" },
-            { "Thermal vision sights", "Optics" },
-
-            // Tactical devices
-            { "Flashlights", "Tactical" },
-            { "Tactical combo devices", "Tactical" },
-
-            // Helmet mods
-            { "Helmet mods", "Helmet Mods" },
-
-            // Weapons
-            { "Weapons", "Weapons" },
-
-            // Quest items
-            { "Quest Items", "Quest Items" },
-
-            // Misc
-            { "Posters", "Misc" },
-            { "Dogtag", "Misc" },
-        };
-
-        /// <summary>
-        /// Get the parent/grouped category for a given category
-        /// </summary>
-        private static string GetParentCategory(string? category)
-        {
-            if (string.IsNullOrEmpty(category))
-                return "Other";
-
-            // If category contains "|", take the first part (parent category)
-            var baseCategory = category.Contains('|') ? category.Split('|')[0] : category;
-
-            // Check if we have a mapping for this category
-            if (CategoryMapping.TryGetValue(baseCategory, out var parentCategory))
-                return parentCategory;
-
-            // Return base category if no mapping found
-            return baseCategory;
-        }
 
         public ItemsPage()
         {
@@ -478,102 +353,7 @@ namespace TarkovHelper.Pages
 
         private async Task LoadItemsAsync()
         {
-            // Get hideout requirements
-            var hideoutItems = _hideoutProgressService.GetAllRemainingItemRequirements();
-
-            // Get quest requirements
-            var questItems = GetQuestItemRequirements();
-
-            // Merge both sources
-            var mergedItems = new Dictionary<string, AggregatedItemViewModel>(StringComparer.OrdinalIgnoreCase);
-
-            // Add hideout items
-            foreach (var kvp in hideoutItems)
-            {
-                var hideoutItem = kvp.Value;
-                var (displayName, subtitle, showSubtitle) = GetLocalizedNames(
-                    hideoutItem.ItemName, hideoutItem.ItemNameKo, hideoutItem.ItemNameJa);
-
-                // Get wiki link and category from item lookup
-                string? wikiLink = null;
-                string? category = null;
-                if (_itemLookup != null && _itemLookup.TryGetValue(hideoutItem.ItemNormalizedName, out var itemInfo))
-                {
-                    wikiLink = itemInfo.WikiLink;
-                    category = itemInfo.Category;
-                }
-
-                mergedItems[kvp.Key] = new AggregatedItemViewModel
-                {
-                    ItemId = hideoutItem.ItemId,
-                    ItemNormalizedName = hideoutItem.ItemNormalizedName,
-                    DisplayName = displayName,
-                    SubtitleName = subtitle,
-                    SubtitleVisibility = showSubtitle ? Visibility.Visible : Visibility.Collapsed,
-                    Category = category,
-                    ParentCategory = GetParentCategory(category),
-                    QuestCount = 0,
-                    QuestFIRCount = 0,
-                    HideoutCount = hideoutItem.HideoutCount,
-                    HideoutFIRCount = hideoutItem.HideoutFIRCount,
-                    TotalCount = hideoutItem.HideoutCount,
-                    TotalFIRCount = hideoutItem.HideoutFIRCount,
-                    FoundInRaid = hideoutItem.FoundInRaid,
-                    IconLink = hideoutItem.IconLink,
-                    WikiLink = wikiLink
-                };
-            }
-
-            // Add/merge quest items
-            foreach (var kvp in questItems)
-            {
-                var questItem = kvp.Value;
-                if (mergedItems.TryGetValue(kvp.Key, out var existing))
-                {
-                    existing.QuestCount = questItem.QuestCount;
-                    existing.QuestFIRCount = questItem.QuestFIRCount;
-                    existing.TotalCount = existing.HideoutCount + questItem.QuestCount;
-                    existing.TotalFIRCount = existing.HideoutFIRCount + questItem.QuestFIRCount;
-                    if (questItem.FoundInRaid)
-                        existing.FoundInRaid = true;
-                    // Copy wiki link if not already set
-                    if (string.IsNullOrEmpty(existing.WikiLink))
-                        existing.WikiLink = questItem.WikiLink;
-                    // Copy category if not already set
-                    if (string.IsNullOrEmpty(existing.Category))
-                    {
-                        existing.Category = questItem.Category;
-                        existing.ParentCategory = GetParentCategory(questItem.Category);
-                    }
-                }
-                else
-                {
-                    var (displayName, subtitle, showSubtitle) = GetLocalizedNames(
-                        questItem.ItemName, questItem.ItemNameKo, questItem.ItemNameJa);
-
-                    mergedItems[kvp.Key] = new AggregatedItemViewModel
-                    {
-                        ItemId = questItem.ItemId,
-                        ItemNormalizedName = questItem.ItemNormalizedName,
-                        DisplayName = displayName,
-                        SubtitleName = subtitle,
-                        SubtitleVisibility = showSubtitle ? Visibility.Visible : Visibility.Collapsed,
-                        Category = questItem.Category,
-                        ParentCategory = GetParentCategory(questItem.Category),
-                        QuestCount = questItem.QuestCount,
-                        QuestFIRCount = questItem.QuestFIRCount,
-                        HideoutCount = 0,
-                        HideoutFIRCount = 0,
-                        TotalCount = questItem.QuestCount,
-                        TotalFIRCount = questItem.QuestFIRCount,
-                        FoundInRaid = questItem.FoundInRaid,
-                        IconLink = questItem.IconLink,
-                        WikiLink = questItem.WikiLink
-                    };
-                }
-            }
-
-            _allItemViewModels = mergedItems.Values.ToList();
+            _allItemViewModels = await _itemsDataService.GetAggregatedItemsAsync(_itemLookup);
 
             // Build parent category list from loaded items
             var newCategories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -782,98 +562,7 @@ namespace TarkovHelper.Pages
             _scrollDebounceTimer.Start();
         }
 
-        private Dictionary<string, QuestItemAggregate> GetQuestItemRequirements()
-        {
-            var result = new Dictionary<string, QuestItemAggregate>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (var task in _questProgressService.AllTasks)
-            {
-                // Skip completed, failed, or unavailable quests (includes faction-restricted quests)
-                var status = _questProgressService.GetStatus(task);
-                if (status == QuestStatus.Done || status == QuestStatus.Failed || status == QuestStatus.Unavailable)
-                    continue;
-
-                if (task.RequiredItems == null)
-                    continue;
-
-                foreach (var questItem in task.RequiredItems)
-                {
-                    // Direct lookup by ItemId (QuestRequiredItems.ItemId -> Items.Id)
-                    TarkovItem? itemInfo = null;
-                    _itemLookup?.TryGetValue(questItem.ItemNormalizedName, out itemInfo);
-
-                    // Skip if item not found in Items table
-                    if (itemInfo == null)
-                        continue;
-
-                    // Skip quest-only items (they don't need to be tracked in the Items tab)
-                    if (string.Equals(itemInfo.Category, "Quest Items", StringComparison.OrdinalIgnoreCase))
-                        continue;
-
-                    var itemName = itemInfo.Name;
-                    var iconLink = itemInfo.IconLink;
-                    var wikiLink = itemInfo.WikiLink;
-
-                    // For currency items, count by reference (1 per quest) instead of total amount
-                    var countToAdd = IsCurrency(questItem.ItemNormalizedName) ? 1 : questItem.Amount;
-                    var firCountToAdd = questItem.FoundInRaid ? countToAdd : 0;
-
-                    if (result.TryGetValue(questItem.ItemNormalizedName, out var existing))
-                    {
-                        existing.QuestCount += countToAdd;
-                        if (questItem.FoundInRaid)
-                        {
-                            existing.QuestFIRCount += countToAdd;
-                            existing.FoundInRaid = true;
-                        }
-                    }
-                    else
-                    {
-                        result[questItem.ItemNormalizedName] = new QuestItemAggregate
-                        {
-                            ItemId = itemInfo?.Id ?? questItem.ItemNormalizedName,
-                            ItemName = itemName,
-                            ItemNameKo = itemInfo?.NameKo,
-                            ItemNameJa = itemInfo?.NameJa,
-                            ItemNormalizedName = questItem.ItemNormalizedName,
-                            IconLink = iconLink,
-                            WikiLink = wikiLink,
-                            Category = itemInfo?.Category,
-                            QuestCount = countToAdd,
-                            QuestFIRCount = firCountToAdd,
-                            FoundInRaid = questItem.FoundInRaid
-                        };
-                    }
-                }
-            }
-
-            return result;
-        }
-
-        private (string DisplayName, string Subtitle, bool ShowSubtitle) GetLocalizedNames(
-            string name, string? nameKo, string? nameJa)
-        {
-            var lang = _loc.CurrentLanguage;
-
-            if (lang == AppLanguage.EN)
-            {
-                return (name, string.Empty, false);
-            }
-
-            var localizedName = lang switch
-            {
-                AppLanguage.KO => nameKo,
-                AppLanguage.JA => nameJa,
-                _ => null
-            };
-
-            if (!string.IsNullOrEmpty(localizedName))
-            {
-                return (localizedName, name, true);
-            }
-
-            return (name, string.Empty, false);
-        }
 
         private void ApplyFilters()
         {
@@ -885,63 +574,16 @@ namespace TarkovHelper.Pages
             var hideFulfilled = ChkHideFulfilled.IsChecked == true;
             var sortBy = (CmbSort.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Name";
 
-            var filtered = _allItemViewModels.Where(vm =>
-            {
-                // Search filter
-                if (!string.IsNullOrEmpty(searchText))
-                {
-                    if (!vm.DisplayName.ToLowerInvariant().Contains(searchText) &&
-                        !vm.SubtitleName.ToLowerInvariant().Contains(searchText))
-                        return false;
-                }
+            var filteredList = ItemsFilterService.FilterAndSort(
+                _allItemViewModels,
+                searchText,
+                sourceFilter,
+                categoryFilter,
+                fulfillmentFilter,
+                firOnly,
+                hideFulfilled,
+                sortBy).ToList();
 
-                // Source filter
-                if (sourceFilter == "Quest" && vm.QuestCount == 0)
-                    return false;
-                if (sourceFilter == "Hideout" && vm.HideoutCount == 0)
-                    return false;
-
-                // Category filter (uses parent/grouped category)
-                if (categoryFilter != "All")
-                {
-                    if (!string.Equals(vm.ParentCategory, categoryFilter, StringComparison.OrdinalIgnoreCase))
-                        return false;
-                }
-
-                // FIR filter
-                if (firOnly && !vm.FoundInRaid)
-                    return false;
-
-                // Fulfillment filter
-                if (fulfillmentFilter != "All")
-                {
-                    var status = vm.FulfillmentStatus;
-                    if (fulfillmentFilter == "NotStarted" && status != ItemFulfillmentStatus.NotStarted)
-                        return false;
-                    if (fulfillmentFilter == "InProgress" && status != ItemFulfillmentStatus.PartiallyFulfilled)
-                        return false;
-                    if (fulfillmentFilter == "Fulfilled" && status != ItemFulfillmentStatus.Fulfilled)
-                        return false;
-                }
-
-                // Hide fulfilled filter
-                if (hideFulfilled && vm.IsFulfilled)
-                    return false;
-
-                return true;
-            });
-
-            // Apply sorting
-            filtered = sortBy switch
-            {
-                "Total" => filtered.OrderByDescending(vm => vm.TotalCount).ThenBy(vm => vm.DisplayName),
-                "Quest" => filtered.OrderByDescending(vm => vm.QuestCount).ThenBy(vm => vm.DisplayName),
-                "Hideout" => filtered.OrderByDescending(vm => vm.HideoutCount).ThenBy(vm => vm.DisplayName),
-                "Progress" => filtered.OrderByDescending(vm => vm.ProgressPercent).ThenBy(vm => vm.DisplayName),
-                _ => filtered.OrderBy(vm => vm.DisplayName)
-            };
-
-            var filteredList = filtered.ToList();
             LstItems.ItemsSource = filteredList;
 
             // Update statistics
@@ -952,11 +594,11 @@ namespace TarkovHelper.Pages
             var fulfilledCount = filteredList.Count(i => i.IsFulfilled);
             var inProgressCount = filteredList.Count(i => i.FulfillmentStatus == ItemFulfillmentStatus.PartiallyFulfilled);
 
-            TxtStats.Text = $"Showing {totalItems} items | " +
-                           $"Quest: {totalQuestCount} | " +
-                           $"Hideout: {totalHideoutCount} | " +
-                           $"Fulfilled: {fulfilledCount} | " +
-                           $"In Progress: {inProgressCount}";
+            TxtStats.Text = string.Format(_loc.ItemsShowing, totalItems) + " | " +
+                           $"{_loc.ItemsFilterQuest}: {totalQuestCount} | " +
+                           $"{_loc.ItemsFilterHideout}: {totalHideoutCount} | " +
+                           $"{_loc.ItemsFilterFulfilled}: {fulfilledCount} | " +
+                           $"{_loc.ItemsFilterInProgress}: {inProgressCount}";
         }
 
         private void CmbFulfillment_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -987,6 +629,17 @@ namespace TarkovHelper.Pages
         private void CmbSort_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (!_isInitializing) ApplyFilters();
+        }
+
+        /// <summary>
+        /// 데이터를 강제로 다시 로드 (프로필 전환 시 사용)
+        /// </summary>
+        public async Task ReloadDataAsync()
+        {
+            await LoadItemsAsync();
+            ApplyFilters();
+            UpdateDetailPanel();
+            _ = LoadImagesInBackgroundAsync();
         }
 
         /// <summary>
@@ -1124,9 +777,9 @@ namespace TarkovHelper.Pages
             var status = itemVm.FulfillmentStatus;
             var statusText = status switch
             {
-                ItemFulfillmentStatus.Fulfilled => "Fulfilled",
-                ItemFulfillmentStatus.PartiallyFulfilled => "In Progress",
-                _ => "Not Started"
+                ItemFulfillmentStatus.Fulfilled => "완료",
+                ItemFulfillmentStatus.PartiallyFulfilled => "진행 중",
+                _ => "미시작"
             };
 
             TxtDetailFulfillmentStatus.Text = statusText;
@@ -1141,12 +794,12 @@ namespace TarkovHelper.Pages
             DetailProgressBar.Value = itemVm.ProgressPercent;
 
             // Populate quest sources
-            var questSources = GetQuestSources(itemVm.ItemNormalizedName);
+            var questSources = _itemsDataService.GetQuestSources(itemVm.ItemNormalizedName);
             QuestRequirementsList.ItemsSource = questSources;
             QuestSection.Visibility = questSources.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
             // Populate hideout sources
-            var hideoutSources = GetHideoutSources(itemVm.ItemNormalizedName);
+            var hideoutSources = _itemsDataService.GetHideoutSources(itemVm.ItemNormalizedName);
             HideoutRequirementsList.ItemsSource = hideoutSources;
             HideoutSection.Visibility = hideoutSources.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
@@ -1239,52 +892,16 @@ namespace TarkovHelper.Pages
             UpdateDetailInventoryDisplay();
 
             // Populate quest sources
-            var questSources = GetQuestSources(_selectedItem.ItemNormalizedName);
+            var questSources = _itemsDataService.GetQuestSources(_selectedItem.ItemNormalizedName);
             QuestRequirementsList.ItemsSource = questSources;
             QuestSection.Visibility = questSources.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
             // Populate hideout sources
-            var hideoutSources = GetHideoutSources(_selectedItem.ItemNormalizedName);
+            var hideoutSources = _itemsDataService.GetHideoutSources(_selectedItem.ItemNormalizedName);
             HideoutRequirementsList.ItemsSource = hideoutSources;
             HideoutSection.Visibility = hideoutSources.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
 
-        private List<QuestItemSourceViewModel> GetQuestSources(string itemNormalizedName)
-        {
-            var sources = new List<QuestItemSourceViewModel>();
-
-            foreach (var task in _questProgressService.AllTasks)
-            {
-                // Skip completed, failed, or unavailable quests (includes faction-restricted quests)
-                var status = _questProgressService.GetStatus(task);
-                if (status == QuestStatus.Done || status == QuestStatus.Failed || status == QuestStatus.Unavailable)
-                    continue;
-
-                if (task.RequiredItems == null)
-                    continue;
-
-                foreach (var questItem in task.RequiredItems)
-                {
-                    if (string.Equals(questItem.ItemNormalizedName, itemNormalizedName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        var questName = GetLocalizedQuestName(task);
-                        var traderName = GetLocalizedTraderName(task);
-                        sources.Add(new QuestItemSourceViewModel
-                        {
-                            QuestName = questName,
-                            TraderName = traderName,
-                            Amount = questItem.Amount,
-                            FoundInRaid = questItem.FoundInRaid,
-                            Task = task,
-                            QuestNormalizedName = task.NormalizedName ?? string.Empty, // For navigation
-                            DogtagMinLevel = questItem.DogtagMinLevel
-                        });
-                    }
-                }
-            }
-
-            return sources;
-        }
 
         /// <summary>
         /// Handle click on quest name to navigate to Quests tab
@@ -1314,64 +931,7 @@ namespace TarkovHelper.Pages
             }
         }
 
-        private List<HideoutItemSourceViewModel> GetHideoutSources(string itemNormalizedName)
-        {
-            var sources = new List<HideoutItemSourceViewModel>();
 
-            foreach (var module in _hideoutProgressService.AllModules)
-            {
-                var currentLevel = _hideoutProgressService.GetCurrentLevel(module);
-
-                foreach (var level in module.Levels.Where(l => l.Level > currentLevel))
-                {
-                    foreach (var itemReq in level.ItemRequirements)
-                    {
-                        if (string.Equals(itemReq.ItemNormalizedName, itemNormalizedName, StringComparison.OrdinalIgnoreCase))
-                        {
-                            var moduleName = GetLocalizedModuleName(module);
-                            sources.Add(new HideoutItemSourceViewModel
-                            {
-                                ModuleName = moduleName,
-                                Level = level.Level,
-                                Amount = itemReq.Count,
-                                FoundInRaid = itemReq.FoundInRaid,
-                                StationId = module.Id
-                            });
-                        }
-                    }
-                }
-            }
-
-            return sources.OrderBy(s => s.ModuleName).ThenBy(s => s.Level).ToList();
-        }
-
-        private string GetLocalizedQuestName(TarkovTask task)
-        {
-            var lang = _loc.CurrentLanguage;
-            return lang switch
-            {
-                AppLanguage.KO => task.NameKo ?? task.Name,
-                AppLanguage.JA => task.NameJa ?? task.Name,
-                _ => task.Name
-            };
-        }
-
-        private string GetLocalizedModuleName(HideoutModule module)
-        {
-            var lang = _loc.CurrentLanguage;
-            return lang switch
-            {
-                AppLanguage.KO => module.NameKo ?? module.Name,
-                AppLanguage.JA => module.NameJa ?? module.Name,
-                _ => module.Name
-            };
-        }
-
-        private string GetLocalizedTraderName(TarkovTask task)
-        {
-            // TarkovTask doesn't have localized trader names, so return the English name
-            return task.Trader;
-        }
 
         private void BtnWiki_Click(object sender, RoutedEventArgs e)
         {
@@ -1542,9 +1102,9 @@ namespace TarkovHelper.Pages
             var status = _selectedItem.FulfillmentStatus;
             var statusText = status switch
             {
-                ItemFulfillmentStatus.Fulfilled => "Fulfilled",
-                ItemFulfillmentStatus.PartiallyFulfilled => "In Progress",
-                _ => "Not Started"
+                ItemFulfillmentStatus.Fulfilled => _loc.ItemsFilterFulfilled,
+                ItemFulfillmentStatus.PartiallyFulfilled => _loc.ItemsFilterInProgress,
+                _ => _loc.ItemsFilterNotStarted
             };
 
             TxtDetailFulfillmentStatus.Text = statusText;

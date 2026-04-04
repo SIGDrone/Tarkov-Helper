@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:svgc="http://sharpvectors.codeplex.com/svgc/"
         mc:Ignorable="d"
-        Title="Tarkov Helper - MiniMap"
+        Title="Tarkov Helper - 미니맵"
         Width="300" Height="300"
         MinWidth="100" MinHeight="100"
         MaxWidth="800" MaxHeight="800"
@@ -78,7 +78,7 @@
 
             <!-- 맵 없음 메시지 -->
             <TextBlock x:Name="TxtNoMap"
-                       Text="No map selected"
+                       Text="지도가 선택되지 않았습니다"
                        Foreground="#666666"
                        FontSize="14"
                        HorizontalAlignment="Center"

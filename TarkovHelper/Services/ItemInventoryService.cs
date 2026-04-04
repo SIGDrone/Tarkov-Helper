@@ -268,6 +268,15 @@ namespace TarkovHelper.Services
             InventoryChanged?.Invoke(this, EventArgs.Empty);
         }
 
+        /// <summary>
+        /// 강제로 인벤토리를 다시 로드 (프로필 전환 시 사용)
+        /// </summary>
+        public void ReloadInventory()
+        {
+            LoadInventory();
+            InventoryChanged?.Invoke(this, EventArgs.Empty);
+        }
+
         #region Persistence
 
         private void ScheduleSave(string itemNormalizedName)

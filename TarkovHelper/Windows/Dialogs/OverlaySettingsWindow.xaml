@@ -4,7 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="Overlay Settings"
+        Title="오버레이 설정"
         Width="320" Height="400"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
@@ -94,14 +94,14 @@
         <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
             <StackPanel>
                 <!-- Opacity -->
-                <TextBlock Text="Display" Style="{StaticResource SectionHeader}"/>
+                <TextBlock Text="디스플레이" Style="{StaticResource SectionHeader}"/>
 
                 <Grid Margin="0,4">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="Opacity" Style="{StaticResource SettingLabel}"/>
+                    <TextBlock Grid.Column="0" Text="투명도" Style="{StaticResource SettingLabel}"/>
                     <TextBlock x:Name="TxtOpacity" Grid.Column="1" Style="{StaticResource SettingValue}"/>
                 </Grid>
                 <Slider x:Name="SliderOpacity" Minimum="10" Maximum="100" Value="80"
@@ -113,62 +113,62 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="Zoom Level" Style="{StaticResource SettingLabel}"/>
+                    <TextBlock Grid.Column="0" Text="줌 레벨" Style="{StaticResource SettingLabel}"/>
                     <TextBlock x:Name="TxtZoom" Grid.Column="1" Style="{StaticResource SettingValue}"/>
                 </Grid>
                 <Slider x:Name="SliderZoom" Minimum="25" Maximum="400" Value="100"
                         ValueChanged="SliderZoom_ValueChanged"/>
 
                 <!-- View Mode -->
-                <TextBlock Text="View Mode" Style="{StaticResource SectionHeader}"/>
+                <TextBlock Text="뷰 모드" Style="{StaticResource SectionHeader}"/>
 
-                <RadioButton x:Name="RbFixed" Content="Fixed View" Foreground="#E0E0E0" Margin="0,4"
+                <RadioButton x:Name="RbFixed" Content="고정 뷰" Foreground="#E0E0E0" Margin="0,4"
                              Checked="ViewMode_Changed"/>
-                <RadioButton x:Name="RbTracking" Content="Player Tracking" Foreground="#E0E0E0" Margin="0,4"
+                <RadioButton x:Name="RbTracking" Content="플레이어 트래킹" Foreground="#E0E0E0" Margin="0,4"
                              Checked="ViewMode_Changed"/>
 
                 <!-- Markers -->
-                <TextBlock Text="Markers" Style="{StaticResource SectionHeader}"/>
+                <TextBlock Text="마커" Style="{StaticResource SectionHeader}"/>
 
-                <CheckBox x:Name="ChkQuestMarkers" Content="Show Quest Markers"
+                <CheckBox x:Name="ChkQuestMarkers" Content="퀘스트 마커 표시"
                           Checked="Marker_Changed" Unchecked="Marker_Changed"/>
-                <CheckBox x:Name="ChkHideCompletedObjectives" Content="Hide Completed Objectives"
+                <CheckBox x:Name="ChkHideCompletedObjectives" Content="완료된 목표 숨기기"
                           Checked="HideCompleted_Changed" Unchecked="HideCompleted_Changed"/>
 
-                <CheckBox x:Name="ChkExtractMarkers" Content="Show Extract Markers"
+                <CheckBox x:Name="ChkExtractMarkers" Content="탈출구 마커 표시"
                           Checked="Marker_Changed" Unchecked="Marker_Changed"/>
 
                 <!-- Extract Filters (synced with MapPage) -->
                 <StackPanel Margin="20,4,0,0">
-                    <CheckBox x:Name="ChkShowPmcExtracts" Content="PMC Extracts" Foreground="#4CAF50"
+                    <CheckBox x:Name="ChkShowPmcExtracts" Content="PMC 탈출구" Foreground="#4CAF50"
                               Checked="ExtractFilter_Changed" Unchecked="ExtractFilter_Changed"/>
-                    <CheckBox x:Name="ChkShowScavExtracts" Content="Scav Extracts" Foreground="#9E9E9E"
+                    <CheckBox x:Name="ChkShowScavExtracts" Content="스캐브 탈출구" Foreground="#9E9E9E"
                               Checked="ExtractFilter_Changed" Unchecked="ExtractFilter_Changed"/>
-                    <CheckBox x:Name="ChkShowTransitExtracts" Content="Transit" Foreground="#FF9800"
+                    <CheckBox x:Name="ChkShowTransitExtracts" Content="트랜짓" Foreground="#FF9800"
                               Checked="ExtractFilter_Changed" Unchecked="ExtractFilter_Changed"/>
                 </StackPanel>
 
                 <!-- Mode -->
-                <TextBlock Text="Interaction" Style="{StaticResource SectionHeader}"/>
+                <TextBlock Text="상호작용" Style="{StaticResource SectionHeader}"/>
 
-                <CheckBox x:Name="ChkClickThrough" Content="Click-Through Mode"
+                <CheckBox x:Name="ChkClickThrough" Content="클릭 투과 모드"
                           Checked="ClickThrough_Changed" Unchecked="ClickThrough_Changed"/>
-                <TextBlock Text="When enabled, mouse clicks pass through the overlay"
+                <TextBlock Text="활성화하면 마우스 클릭이 오버레이를 통과합니다"
                            Foreground="#666666" FontSize="11" Margin="20,0,0,0"/>
 
                 <!-- Actions -->
-                <TextBlock Text="Actions" Style="{StaticResource SectionHeader}"/>
+                <TextBlock Text="작업" Style="{StaticResource SectionHeader}"/>
 
-                <Button Content="Center on Player" Style="{StaticResource ActionButton}"
+                <Button Content="플레이어 중앙에 맞춤" Style="{StaticResource ActionButton}"
                         Click="BtnCenterPlayer_Click" Margin="0,4"/>
-                <Button Content="Reset to Defaults" Style="{StaticResource ActionButton}"
+                <Button Content="기본값으로 초기화" Style="{StaticResource ActionButton}"
                         Click="BtnReset_Click" Margin="0,4"/>
             </StackPanel>
         </ScrollViewer>
 
         <!-- Bottom buttons -->
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
-            <Button Content="Close" Style="{StaticResource ActionButton}"
+            <Button Content="닫기" Style="{StaticResource ActionButton}"
                     Click="BtnClose_Click" Width="80"/>
         </StackPanel>
     </Grid>

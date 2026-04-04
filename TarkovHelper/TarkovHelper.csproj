@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -14,8 +14,8 @@
     <FileVersion>4.3.1</FileVersion>
     <ApplicationIcon>1764579946.ico</ApplicationIcon>
 
-    <!-- AutoUpdater.NET 다국어 리소스 제한 (en, ko, ja만 유지) -->
-    <SatelliteResourceLanguages>en;ko;ja-jp</SatelliteResourceLanguages>
+    <!-- AutoUpdater.NET 다국어 리소스 제한 (ko만 유지) -->
+    <SatelliteResourceLanguages>ko</SatelliteResourceLanguages>
 
     <!-- Run as Administrator -->
     <ApplicationManifest>app.manifest</ApplicationManifest>

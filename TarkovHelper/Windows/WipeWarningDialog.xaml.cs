@@ -60,61 +60,14 @@ public partial class WipeWarningDialog : Window
     /// </summary>
     private void UpdateLocalizedText()
     {
-        TxtTitle.Text = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => "퀘스트 동기화 전 확인",
-            AppLanguage.JA => "クエスト同期前の確認",
-            _ => "Before Quest Sync"
-        };
-
-        TxtMessage.Text = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => "최근 계정 초기화(와이프)를 진행하셨나요?",
-            AppLanguage.JA => "最近アカウントをリセット（ワイプ）しましたか？",
-            _ => "Have you recently reset your account (wipe)?"
-        };
-
-        TxtDescription.Text = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => "계정 초기화 후 동기화를 진행하면 이전 시즌의 로그가 섞여 퀘스트 진행 상태가 올바르지 않게 표시될 수 있습니다.",
-            AppLanguage.JA => "アカウントリセット後に同期すると、以前のシーズンのログが混在し、クエストの進行状況が正しく表示されない場合があります。",
-            _ => "If you sync after a wipe, logs from the previous season may mix and quest progress may be displayed incorrectly."
-        };
-
-        TxtLogFolderLabel.Text = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => "📁 로그 폴더 위치:",
-            AppLanguage.JA => "📁 ログフォルダの場所:",
-            _ => "📁 Log folder location:"
-        };
-
-        TxtRecommendation.Text = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => "💡 권장 조치: 계정 초기화 이전 날짜의 로그 폴더를 삭제하거나 다른 위치로 백업해 주세요.",
-            AppLanguage.JA => "💡 推奨: ワイプ前の日付のログフォルダを削除するか、別の場所にバックアップしてください。",
-            _ => "💡 Recommended: Delete or backup log folders dated before the wipe."
-        };
-
-        ChkDontShowAgain.Content = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => "이 안내를 다시 보지 않기",
-            AppLanguage.JA => "この案内を再び表示しない",
-            _ => "Don't show this again"
-        };
-
-        BtnOpenFolder.Content = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => "폴더 열기",
-            AppLanguage.JA => "フォルダを開く",
-            _ => "Open Folder"
-        };
-
-        BtnContinue.Content = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => "계속 진행",
-            AppLanguage.JA => "続行",
-            _ => "Continue"
-        };
+        TxtTitle.Text = "퀘스트 동기화 전 확인";
+        TxtMessage.Text = "최근 계정 초기화(와이프)를 진행하셨나요?";
+        TxtDescription.Text = "계정 초기화 후 동기화를 진행하면 이전 시즌의 로그가 섞여 퀘스트 진행 상태가 올바르지 않게 표시될 수 있습니다.";
+        TxtLogFolderLabel.Text = "📁 로그 폴더 위치:";
+        TxtRecommendation.Text = "💡 권장 조치: 계정 초기화 이전 날짜의 로그 폴더를 삭제하거나 다른 위치로 백업해 주세요.";
+        ChkDontShowAgain.Content = "이 안내를 다시 보지 않기";
+        BtnOpenFolder.Content = "폴더 열기";
+        BtnContinue.Content = "계속 진행";
     }
 
     private void BtnClose_Click(object sender, RoutedEventArgs e)
@@ -142,13 +95,8 @@ public partial class WipeWarningDialog : Window
             {
                 Clipboard.SetText(_logPath);
                 MessageBox.Show(
-                    _loc.CurrentLanguage switch
-                    {
-                        AppLanguage.KO => "폴더를 열 수 없습니다. 경로가 클립보드에 복사되었습니다.",
-                        AppLanguage.JA => "フォルダを開けませんでした。パスがクリップボードにコピーされました。",
-                        _ => "Could not open folder. Path has been copied to clipboard."
-                    },
-                    _loc.CurrentLanguage switch { AppLanguage.KO => "알림", AppLanguage.JA => "通知", _ => "Notice" },
+                    "폴더를 열 수 없습니다. 경로가 클립보드에 복사되었습니다.",
+                    "알림",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
             }

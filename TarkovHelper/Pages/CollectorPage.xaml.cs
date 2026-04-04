@@ -15,6 +15,7 @@ namespace TarkovHelper.Pages
         private readonly QuestGraphService _questGraphService = QuestGraphService.Instance;
         private readonly ItemInventoryService _inventoryService = ItemInventoryService.Instance;
         private readonly ImageCacheService _imageCache = ImageCacheService.Instance;
+        private readonly ItemsDataService _itemsDataService = ItemsDataService.Instance;
         private List<CollectorItemViewModel> _allItemViewModels = new();
         private Dictionary<string, TarkovItem>? _itemLookup;
         private bool _isInitializing = true;
@@ -23,13 +24,6 @@ namespace TarkovHelper.Pages
         private bool _needsRefreshOnLoad = false; // Flag to indicate data refresh needed after unload
         private string? _pendingItemSelection = null;
 
-        // Currency items should count by reference count, not total amount
-        private static readonly HashSet<string> CurrencyItems = new(StringComparer.OrdinalIgnoreCase)
-        {
-            "roubles", "dollars", "euros"
-        };
-
-        private static bool IsCurrency(string normalizedName) => CurrencyItems.Contains(normalizedName);
 
         public CollectorPage()
         {
@@ -182,29 +176,7 @@ namespace TarkovHelper.Pages
         private async Task LoadItemsAsync()
         {
             var includePreQuest = ChkIncludePreQuest.IsChecked == true;
-            var collectorItems = GetCollectorItemRequirements(includePreQuest);
-
-            _allItemViewModels = collectorItems.Values.Select(item =>
-            {
-                var (displayName, subtitle, showSubtitle) = GetLocalizedNames(
-                    item.ItemName, item.ItemNameKo, item.ItemNameJa);
-
-                return new CollectorItemViewModel
-                {
-                    ItemId = item.ItemId,
-                    ItemNormalizedName = item.ItemNormalizedName,
-                    DisplayName = displayName,
-                    SubtitleName = subtitle,
-                    SubtitleVisibility = showSubtitle ? Visibility.Visible : Visibility.Collapsed,
-                    QuestCount = item.QuestCount,
-                    QuestFIRCount = item.QuestFIRCount,
-                    TotalCount = item.QuestCount,
-                    TotalFIRCount = item.QuestFIRCount,
-                    FoundInRaid = item.FoundInRaid,
-                    IconLink = item.IconLink,
-                    WikiLink = item.WikiLink
-                };
-            }).ToList();
+            _allItemViewModels = await _itemsDataService.GetCollectorAggregatedItemsAsync(includePreQuest, _itemLookup);
 
             // Load inventory data
             foreach (var vm in _allItemViewModels)
@@ -213,106 +185,6 @@ namespace TarkovHelper.Pages
                 vm.OwnedFirQuantity = inventory.FirQuantity;
                 vm.OwnedNonFirQuantity = inventory.NonFirQuantity;
             }
-        }
-
-        /// <summary>
-        /// Get items required for Collector quest and optionally its prerequisites
-        /// </summary>
-        private Dictionary<string, CollectorQuestItemAggregate> GetCollectorItemRequirements(bool includePreQuests)
-        {
-            var result = new Dictionary<string, CollectorQuestItemAggregate>(StringComparer.OrdinalIgnoreCase);
-            var questsToInclude = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            // Find the Collector quest
-            var collectorQuest = _questProgressService.AllTasks
-                .FirstOrDefault(t => string.Equals(t.NormalizedName, "collector", StringComparison.OrdinalIgnoreCase));
-
-            if (collectorQuest != null && !string.IsNullOrEmpty(collectorQuest.NormalizedName))
-            {
-                // Always include Collector quest itself (unless completed, failed, or unavailable)
-                var status = _questProgressService.GetStatus(collectorQuest);
-                if (status != QuestStatus.Done && status != QuestStatus.Failed && status != QuestStatus.Unavailable)
-                {
-                    questsToInclude.Add(collectorQuest.NormalizedName);
-                }
-
-                // If include pre-quests, add all prerequisites of Collector (which are Kappa quests)
-                if (includePreQuests)
-                {
-                    var prereqs = _questGraphService.GetAllPrerequisites(collectorQuest.NormalizedName);
-                    foreach (var prereq in prereqs)
-                    {
-                        if (string.IsNullOrEmpty(prereq.NormalizedName))
-                            continue;
-
-                        // Skip completed, failed, or unavailable quests
-                        var prereqStatus = _questProgressService.GetStatus(prereq);
-                        if (prereqStatus == QuestStatus.Done || prereqStatus == QuestStatus.Failed || prereqStatus == QuestStatus.Unavailable)
-                            continue;
-
-                        questsToInclude.Add(prereq.NormalizedName);
-                    }
-                }
-            }
-
-            // Collect items from all included quests
-            foreach (var task in _questProgressService.AllTasks)
-            {
-                if (string.IsNullOrEmpty(task.NormalizedName))
-                    continue;
-
-                if (!questsToInclude.Contains(task.NormalizedName))
-                    continue;
-
-                if (task.RequiredItems == null)
-                    continue;
-
-                foreach (var questItem in task.RequiredItems)
-                {
-                    // Direct lookup by ItemId (QuestRequiredItems.ItemId -> Items.Id)
-                    TarkovItem? itemInfo = null;
-                    _itemLookup?.TryGetValue(questItem.ItemNormalizedName, out itemInfo);
-
-                    // Skip if item not found in Items table
-                    if (itemInfo == null)
-                        continue;
-
-                    var itemName = itemInfo.Name;
-                    var iconLink = itemInfo.IconLink;
-                    var wikiLink = itemInfo.WikiLink;
-
-                    var countToAdd = IsCurrency(questItem.ItemNormalizedName) ? 1 : questItem.Amount;
-                    var firCountToAdd = questItem.FoundInRaid ? countToAdd : 0;
-
-                    if (result.TryGetValue(questItem.ItemNormalizedName, out var existing))
-                    {
-                        existing.QuestCount += countToAdd;
-                        if (questItem.FoundInRaid)
-                        {
-                            existing.QuestFIRCount += countToAdd;
-                            existing.FoundInRaid = true;
-                        }
-                    }
-                    else
-                    {
-                        result[questItem.ItemNormalizedName] = new CollectorQuestItemAggregate
-                        {
-                            ItemId = itemInfo?.Id ?? questItem.ItemNormalizedName,
-                            ItemName = itemName,
-                            ItemNameKo = itemInfo?.NameKo,
-                            ItemNameJa = itemInfo?.NameJa,
-                            ItemNormalizedName = questItem.ItemNormalizedName,
-                            IconLink = iconLink,
-                            WikiLink = wikiLink,
-                            QuestCount = countToAdd,
-                            QuestFIRCount = firCountToAdd,
-                            FoundInRaid = questItem.FoundInRaid
-                        };
-                    }
-                }
-            }
-
-            return result;
         }
 
         private async Task LoadImagesInBackgroundAsync()
@@ -444,31 +316,6 @@ namespace TarkovHelper.Pages
             _scrollDebounceTimer.Start();
         }
 
-        private (string DisplayName, string Subtitle, bool ShowSubtitle) GetLocalizedNames(
-            string name, string? nameKo, string? nameJa)
-        {
-            var lang = _loc.CurrentLanguage;
-
-            if (lang == AppLanguage.EN)
-            {
-                return (name, string.Empty, false);
-            }
-
-            var localizedName = lang switch
-            {
-                AppLanguage.KO => nameKo,
-                AppLanguage.JA => nameJa,
-                _ => null
-            };
-
-            if (!string.IsNullOrEmpty(localizedName))
-            {
-                return (localizedName, name, true);
-            }
-
-            return (name, string.Empty, false);
-        }
-
         private void ApplyFilters()
         {
             var searchText = TxtSearch.Text?.Trim().ToLowerInvariant() ?? string.Empty;
@@ -477,44 +324,14 @@ namespace TarkovHelper.Pages
             var hideFulfilled = ChkHideFulfilled.IsChecked == true;
             var sortBy = (CmbSort.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Name";
 
-            var filtered = _allItemViewModels.Where(vm =>
-            {
-                if (!string.IsNullOrEmpty(searchText))
-                {
-                    if (!vm.DisplayName.ToLowerInvariant().Contains(searchText) &&
-                        !vm.SubtitleName.ToLowerInvariant().Contains(searchText))
-                        return false;
-                }
+            var filteredList = ItemsFilterService.FilterAndSortCollector(
+                _allItemViewModels,
+                searchText,
+                fulfillmentFilter,
+                firOnly,
+                hideFulfilled,
+                sortBy).ToList();
 
-                if (firOnly && !vm.FoundInRaid)
-                    return false;
-
-                if (fulfillmentFilter != "All")
-                {
-                    var status = vm.FulfillmentStatus;
-                    if (fulfillmentFilter == "NotStarted" && status != ItemFulfillmentStatus.NotStarted)
-                        return false;
-                    if (fulfillmentFilter == "InProgress" && status != ItemFulfillmentStatus.PartiallyFulfilled)
-                        return false;
-                    if (fulfillmentFilter == "Fulfilled" && status != ItemFulfillmentStatus.Fulfilled)
-                        return false;
-                }
-
-                if (hideFulfilled && vm.IsFulfilled)
-                    return false;
-
-                return true;
-            });
-
-            filtered = sortBy switch
-            {
-                "Total" => filtered.OrderByDescending(vm => vm.TotalCount).ThenBy(vm => vm.DisplayName),
-                "Quest" => filtered.OrderByDescending(vm => vm.QuestCount).ThenBy(vm => vm.DisplayName),
-                "Progress" => filtered.OrderByDescending(vm => vm.ProgressPercent).ThenBy(vm => vm.DisplayName),
-                _ => filtered.OrderBy(vm => vm.DisplayName)
-            };
-
-            var filteredList = filtered.ToList();
             LstItems.ItemsSource = filteredList;
 
             var totalItems = filteredList.Count;
@@ -523,11 +340,11 @@ namespace TarkovHelper.Pages
             var inProgressCount = filteredList.Count(i => i.FulfillmentStatus == ItemFulfillmentStatus.PartiallyFulfilled);
             var includePreQuest = ChkIncludePreQuest.IsChecked == true;
 
-            TxtStats.Text = $"Showing {totalItems} items | " +
-                           $"Total: {totalCount} | " +
-                           $"Fulfilled: {fulfilledCount} | " +
-                           $"In Progress: {inProgressCount}" +
-                           (includePreQuest ? " | Including Pre-Quests" : " | Kappa Quests Only");
+            TxtStats.Text = $"아이템 {totalItems}개 표시 중 | " +
+                           $"합계: {totalCount} | " +
+                           $"수집 완료: {fulfilledCount} | " +
+                           $"진행 중: {inProgressCount}" +
+                           (includePreQuest ? " | 선행 퀘스트 포함" : " | 카파 퀘스트 전용");
         }
 
         private async void ChkIncludePreQuest_Changed(object sender, RoutedEventArgs e)
@@ -558,6 +375,17 @@ namespace TarkovHelper.Pages
         private void CmbSort_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (!_isInitializing) ApplyFilters();
+        }
+
+        /// <summary>
+        /// 데이터를 강제로 다시 로드 (프로필 전환 시 사용)
+        /// </summary>
+        public async Task ReloadDataAsync()
+        {
+            await LoadItemsAsync();
+            ApplyFilters();
+            UpdateDetailPanel();
+            _ = LoadImagesInBackgroundAsync();
         }
 
         public void SelectItem(string itemNormalizedName)
@@ -641,9 +469,9 @@ namespace TarkovHelper.Pages
             var status = itemVm.FulfillmentStatus;
             var statusText = status switch
             {
-                ItemFulfillmentStatus.Fulfilled => "Fulfilled",
-                ItemFulfillmentStatus.PartiallyFulfilled => "In Progress",
-                _ => "Not Started"
+                ItemFulfillmentStatus.Fulfilled => "수집 완료",
+                ItemFulfillmentStatus.PartiallyFulfilled => "진행 중",
+                _ => "시작 안 함"
             };
 
             TxtDetailFulfillmentStatus.Text = statusText;
@@ -656,7 +484,8 @@ namespace TarkovHelper.Pages
 
             DetailProgressBar.Value = itemVm.ProgressPercent;
 
-            var questSources = GetQuestSources(itemVm.ItemNormalizedName);
+            var includePreQuest = ChkIncludePreQuest.IsChecked == true;
+            var questSources = _itemsDataService.GetCollectorQuestSources(itemVm.ItemNormalizedName, includePreQuest);
             QuestRequirementsList.ItemsSource = questSources;
             QuestSection.Visibility = questSources.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
@@ -703,89 +532,12 @@ namespace TarkovHelper.Pages
 
             UpdateDetailInventoryDisplay();
 
-            var questSources = GetQuestSources(_selectedItem.ItemNormalizedName);
+            var includePreQuest = ChkIncludePreQuest.IsChecked == true;
+            var questSources = _itemsDataService.GetCollectorQuestSources(_selectedItem.ItemNormalizedName, includePreQuest);
             QuestRequirementsList.ItemsSource = questSources;
             QuestSection.Visibility = questSources.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
 
-        private List<CollectorQuestItemSourceViewModel> GetQuestSources(string itemNormalizedName)
-        {
-            var sources = new List<CollectorQuestItemSourceViewModel>();
-            var includePreQuest = ChkIncludePreQuest.IsChecked == true;
-            var questsToInclude = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            // Find the Collector quest
-            var collectorQuest = _questProgressService.AllTasks
-                .FirstOrDefault(t => string.Equals(t.NormalizedName, "collector", StringComparison.OrdinalIgnoreCase));
-
-            if (collectorQuest != null && !string.IsNullOrEmpty(collectorQuest.NormalizedName))
-            {
-                var status = _questProgressService.GetStatus(collectorQuest);
-                if (status != QuestStatus.Done && status != QuestStatus.Failed && status != QuestStatus.Unavailable)
-                {
-                    questsToInclude.Add(collectorQuest.NormalizedName);
-                }
-
-                // Add prerequisites if needed
-                if (includePreQuest)
-                {
-                    var prereqs = _questGraphService.GetAllPrerequisites(collectorQuest.NormalizedName);
-                    foreach (var prereq in prereqs)
-                    {
-                        if (string.IsNullOrEmpty(prereq.NormalizedName))
-                            continue;
-                        var prereqStatus = _questProgressService.GetStatus(prereq);
-                        if (prereqStatus == QuestStatus.Done || prereqStatus == QuestStatus.Failed || prereqStatus == QuestStatus.Unavailable)
-                            continue;
-                        questsToInclude.Add(prereq.NormalizedName);
-                    }
-                }
-            }
-
-            foreach (var task in _questProgressService.AllTasks)
-            {
-                if (string.IsNullOrEmpty(task.NormalizedName))
-                    continue;
-
-                if (!questsToInclude.Contains(task.NormalizedName))
-                    continue;
-
-                if (task.RequiredItems == null)
-                    continue;
-
-                foreach (var questItem in task.RequiredItems)
-                {
-                    if (string.Equals(questItem.ItemNormalizedName, itemNormalizedName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        var questName = GetLocalizedQuestName(task);
-                        var traderName = task.Trader;
-                        sources.Add(new CollectorQuestItemSourceViewModel
-                        {
-                            QuestName = questName,
-                            TraderName = traderName,
-                            Amount = questItem.Amount,
-                            FoundInRaid = questItem.FoundInRaid,
-                            IsKappaRequired = task.ReqKappa,
-                            Task = task,
-                            QuestNormalizedName = task.NormalizedName ?? string.Empty
-                        });
-                    }
-                }
-            }
-
-            return sources;
-        }
-
-        private string GetLocalizedQuestName(TarkovTask task)
-        {
-            var lang = _loc.CurrentLanguage;
-            return lang switch
-            {
-                AppLanguage.KO => task.NameKo ?? task.Name,
-                AppLanguage.JA => task.NameJa ?? task.Name,
-                _ => task.Name
-            };
-        }
 
         private void QuestName_Click(object sender, MouseButtonEventArgs e)
         {
@@ -943,9 +695,9 @@ namespace TarkovHelper.Pages
             var status = _selectedItem.FulfillmentStatus;
             var statusText = status switch
             {
-                ItemFulfillmentStatus.Fulfilled => "Fulfilled",
-                ItemFulfillmentStatus.PartiallyFulfilled => "In Progress",
-                _ => "Not Started"
+                ItemFulfillmentStatus.Fulfilled => "수집 완료",
+                ItemFulfillmentStatus.PartiallyFulfilled => "진행 중",
+                _ => "시작 안 함"
             };
 
             TxtDetailFulfillmentStatus.Text = statusText;

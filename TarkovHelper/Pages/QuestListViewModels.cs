@@ -54,7 +54,7 @@ namespace TarkovHelper.Pages
     {
         public int GroupId { get; set; }
         public bool IsOrGroup => GroupId > 0;
-        public string GroupLabel => IsOrGroup ? "OR" : "";
+        public string GroupLabel => IsOrGroup ? "선택" : "";
         public Visibility OrLabelVisibility => IsOrGroup ? Visibility.Visible : Visibility.Collapsed;
         public Brush OrGroupBackground => IsOrGroup ? new SolidColorBrush(Color.FromArgb(30, 33, 150, 243)) : Brushes.Transparent;
         public List<PrerequisiteItemViewModel> Items { get; set; } = new();
@@ -70,7 +70,7 @@ namespace TarkovHelper.Pages
         public string StatusText { get; set; } = string.Empty;
         public Brush StatusBackground { get; set; } = Brushes.Gray;
         public bool IsOrItem { get; set; }
-        public string OrSeparator => IsOrItem ? " OR " : "";
+        public string OrSeparator => IsOrItem ? " 또는 " : "";
         public Visibility OrSeparatorVisibility => IsOrItem ? Visibility.Visible : Visibility.Collapsed;
         public string BulletText => IsOrItem ? "" : "• ";
     }

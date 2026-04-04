@@ -526,7 +526,7 @@ public class MapExtractMarkerManager
         }
         else
         {
-            floorText = (markerOrder + 1).ToString(); // Order 1 = 2층
+            floorText = $"{markerOrder + 1}F"; // Order 1 = 2층
         }
 
         return (arrow, floorText, color);

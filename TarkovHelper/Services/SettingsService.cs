@@ -213,7 +213,7 @@ public class SettingsService
         get
         {
             if (!_settingsLoaded) LoadSettings();
-            return _logMonitoringEnabled ?? true;  // Default: enabled
+            return _logMonitoringEnabled ?? false;  // Default: disabled
         }
         set
         {
@@ -486,6 +486,7 @@ public class SettingsService
     public double MapLastZoomLevel { get => Map.LastZoomLevel; set => Map.LastZoomLevel = value; }
     public double MapLastTranslateX { get => Map.LastTranslateX; set => Map.LastTranslateX = value; }
     public double MapLastTranslateY { get => Map.LastTranslateY; set => Map.LastTranslateY = value; }
+    public bool IsCustomMarkersPanelCollapsed { get => Map.IsCustomMarkersPanelCollapsed; set => Map.IsCustomMarkersPanelCollapsed = value; }
 
     public void AddHiddenQuest(string questId) => Map.AddHiddenQuest(questId);
     public void RemoveHiddenQuest(string questId) => Map.RemoveHiddenQuest(questId);
@@ -508,7 +509,7 @@ public class SettingsService
             var logsPath = GetLogsPathFromGameFolder(gameFolder);
             if (logsPath != null)
             {
-                _detectionMethod = "BSG Launcher";
+                _detectionMethod = "BSG 런처";
                 return logsPath;
             }
         }
@@ -520,7 +521,7 @@ public class SettingsService
             var logsPath = GetLogsPathFromGameFolder(gameFolder);
             if (logsPath != null)
             {
-                _detectionMethod = "Steam";
+                _detectionMethod = "스팀";
                 return logsPath;
             }
         }
@@ -532,7 +533,7 @@ public class SettingsService
             var logsPath = GetLogsPathFromGameFolder(gameFolder);
             if (logsPath != null)
             {
-                _detectionMethod = "Default Path";
+                _detectionMethod = "기본 경로";
                 return logsPath;
             }
         }
@@ -743,8 +744,32 @@ public class SettingsService
         SaveSetting(key, value);
     }
 
+    /// <summary>
+    /// 강제로 설정을 다시 로드 (프로필 전환 시 사용)
+    /// </summary>
+    public void ReloadSettings()
+    {
+        _settingsLoaded = false;
+        LoadSettings();
+    }
+
     private void LoadSettings()
     {
+        // Reset cached values
+        _logFolderPath = null;
+        _logMonitoringEnabled = null;
+        _playerLevel = null;
+        _scavRep = null;
+        _showLevelLockedQuests = null;
+        _hideWipeWarning = null;
+        _syncDaysRange = null;
+        _baseFontSize = null;
+        _dspDecodeCount = null;
+        _playerFaction = null;
+        _hasEodEdition = null;
+        _hasUnheardEdition = null;
+        _prestigeLevel = null;
+
         _settingsLoaded = true;
 
         try

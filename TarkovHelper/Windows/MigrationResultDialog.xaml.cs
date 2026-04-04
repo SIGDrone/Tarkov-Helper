@@ -46,33 +46,16 @@ public partial class MigrationResultDialog : Window
         TxtMigrationInventoryCount.Text = result.ItemInventoryCount.ToString();
         TxtMigrationSettingsCount.Text = result.SettingsCount.ToString();
 
-        TxtMigrationTotalCount.Text = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => $"{result.TotalCount}개 항목",
-            AppLanguage.JA => $"{result.TotalCount}件",
-            _ => $"{result.TotalCount} items"
-        };
+        TxtMigrationTotalCount.Text = $"{result.TotalCount}개 항목";
 
         // Show warnings if any
         if (result.HasWarnings || result.HasErrors)
         {
-            var allMessages = result.Errors.Concat(result.Warnings).ToList();
+            var allMessages = result.Errors.Concat(result.Warnings).Cast<object>().ToList();
             MigrationWarningsList.ItemsSource = allMessages;
             MigrationWarningsSection.Visibility = Visibility.Visible;
 
-            TxtMigrationWarningsHeader.Text = result.HasErrors
-                ? _loc.CurrentLanguage switch
-                {
-                    AppLanguage.KO => "오류 및 경고",
-                    AppLanguage.JA => "エラーと警告",
-                    _ => "Errors & Warnings"
-                }
-                : _loc.CurrentLanguage switch
-                {
-                    AppLanguage.KO => "경고",
-                    AppLanguage.JA => "警告",
-                    _ => "Warnings"
-                };
+            TxtMigrationWarningsHeader.Text = result.HasErrors ? "오류 및 경고" : "경고";
 
             TxtMigrationWarningsHeader.Foreground = result.HasErrors
                 ? new SolidColorBrush(Color.FromRgb(239, 83, 80)) // Red
@@ -106,61 +89,13 @@ public partial class MigrationResultDialog : Window
     /// </summary>
     private void UpdateLocalizedText(ConfigMigrationService.MigrationResult result)
     {
-        TxtMigrationResultTitle.Text = result.HasErrors
-            ? _loc.CurrentLanguage switch
-            {
-                AppLanguage.KO => "마이그레이션 실패",
-                AppLanguage.JA => "移行失敗",
-                _ => "Migration Failed"
-            }
-            : _loc.CurrentLanguage switch
-            {
-                AppLanguage.KO => "마이그레이션 완료",
-                AppLanguage.JA => "移行完了",
-                _ => "Migration Complete"
-            };
-
-        TxtMigrationQuestLabel.Text = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => "퀘스트 진행",
-            AppLanguage.JA => "クエスト進行",
-            _ => "Quest Progress"
-        };
-
-        TxtMigrationHideoutLabel.Text = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => "하이드아웃 진행",
-            AppLanguage.JA => "ハイドアウト進行",
-            _ => "Hideout Progress"
-        };
-
-        TxtMigrationInventoryLabel.Text = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => "아이템 인벤토리",
-            AppLanguage.JA => "アイテムインベントリ",
-            _ => "Item Inventory"
-        };
-
-        TxtMigrationSettingsLabel.Text = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => "설정",
-            AppLanguage.JA => "設定",
-            _ => "Settings"
-        };
-
-        TxtMigrationTotalLabel.Text = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => "총 가져온 항목: ",
-            AppLanguage.JA => "インポート合計: ",
-            _ => "Total imported: "
-        };
-
-        BtnOk.Content = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => "확인",
-            AppLanguage.JA => "確認",
-            _ => "OK"
-        };
+        TxtMigrationResultTitle.Text = result.HasErrors ? "마이그레이션 실패" : "마이그레이션 완료";
+        TxtMigrationQuestLabel.Text = "퀘스트 진행";
+        TxtMigrationHideoutLabel.Text = "하이드아웃 진행";
+        TxtMigrationInventoryLabel.Text = "아이템 인벤토리";
+        TxtMigrationSettingsLabel.Text = "설정";
+        TxtMigrationTotalLabel.Text = "총 가져온 항목: ";
+        BtnOk.Content = "확인";
     }
 
     private void BtnClose_Click(object sender, RoutedEventArgs e)

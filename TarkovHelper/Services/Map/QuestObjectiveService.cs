@@ -138,7 +138,7 @@ public sealed class QuestObjectiveService
                 if (status == QuestStatus.Active)
                 {
                     // 목표 완료 상태 확인
-                    obj.IsCompleted = progressService.IsObjectiveCompletedById(obj.ObjectiveId);
+                    obj.IsCompleted = ObjectiveProgressService.Instance.IsObjectiveCompletedById(obj.ObjectiveId);
                     activeObjectives.Add(obj);
                 }
             }

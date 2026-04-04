@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.IO;
+using System.Windows.Data;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -72,6 +73,7 @@ public partial class MapPage : UserControl
     private bool _showLeversMarkerOverlay = true;
     private bool _showBossesMarker = true;
     private bool _isMapMarkersPanelCollapsed;
+    private bool _isCustomMarkersPanelCollapsed;
 
     // EFT 레이드 이벤트 서비스 (자동 맵 전환 및 레이드 감지용)
     private readonly EftRaidEventService _raidEventService = EftRaidEventService.Instance;
@@ -104,6 +106,8 @@ public partial class MapPage : UserControl
     private MapExtractMarkerManager? _extractMarkerManager;
     private MapCalibrationController? _calibrationController;
     private MapMarkersManager? _mapMarkersManager;
+    private MapCustomMarkerManager? _customMarkerManager;
+    private Point _lastRightClickPosition;
 
     public MapPage()
     {
@@ -130,7 +134,7 @@ public partial class MapPage : UserControl
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"MapTrackerPage initialization error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show($"지도 추적 페이지 초기화 오류: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -184,6 +188,22 @@ public partial class MapPage : UserControl
             _trackerService,
             MapMarkerDbService.Instance,
             _loc);
+
+        // MapCustomMarkerManager 초기화
+        _customMarkerManager = new MapCustomMarkerManager(
+            CustomMarkersContainer,
+            _trackerService,
+            _trackerService.Transformer,
+            _loc);
+        _customMarkerManager.StatusUpdated += msg => Dispatcher.Invoke(() => TxtStatus.Text = msg);
+        
+        // 마커 목록 바인딩
+        LstCustomMarkers.ItemsSource = _customMarkerManager.Markers;
+    }
+
+    private void UpdateCustomMarkersParam()
+    {
+        _customMarkerManager?.SetParameters(_currentMapKey, _currentFloorId, _zoomLevel);
     }
 
     private void OnObjectiveSelectedFromManager(object? sender, TaskObjectiveWithLocation objective)
@@ -247,7 +267,7 @@ public partial class MapPage : UserControl
 
             // 퀘스트 진행 상태 변경 이벤트 구독
             _progressService.ProgressChanged += OnQuestProgressChanged;
-            _progressService.ObjectiveProgressChanged += OnObjectiveProgressChanged;
+            ObjectiveProgressService.Instance.ObjectiveProgressChanged += OnObjectiveProgressChanged;
 
             // Global Keyboard Hook 시작 (NumPad 키로 층 변경)
             GlobalKeyboardHookService.Instance.FloorKeyPressed += OnFloorKeyPressed;
@@ -261,7 +281,7 @@ public partial class MapPage : UserControl
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"MapTrackerPage load error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show($"지도 추적 페이지 로드 오류: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -272,7 +292,7 @@ public partial class MapPage : UserControl
 
         // 이벤트 구독 해제
         _progressService.ProgressChanged -= OnQuestProgressChanged;
-        _progressService.ObjectiveProgressChanged -= OnObjectiveProgressChanged;
+        ObjectiveProgressService.Instance.ObjectiveProgressChanged -= OnObjectiveProgressChanged;
         MapMarkerDbService.Instance.DataRefreshed -= OnDatabaseRefreshed;
         QuestObjectiveDbService.Instance.DataRefreshed -= OnDatabaseRefreshed;
 
@@ -363,6 +383,7 @@ public partial class MapPage : UserControl
         BtnFullScreen.Content = _loc.FullScreen;
         BtnExitFullScreen.Content = _loc.ExitFullScreen;
         BtnSettings.Content = _loc.Settings;
+        MenuAddCustomMarker.Header = _loc.AddCustomMarker;
 
         // 추적 버튼 (상태에 따라)
         var isTracking = _trackerService?.IsWatching ?? false;
@@ -410,6 +431,7 @@ public partial class MapPage : UserControl
         ChkShowPmcExtracts.Content = _loc.PmcExtracts;
         ChkShowScavExtracts.Content = _loc.ScavExtracts;
         TxtExtractNameSizeLabel.Text = _loc.ExtractNameSize;
+        TxtMarkerOpacityLabel.Text = _loc.MarkerOpacity;
 
         // 마커 색상 설정
         TxtMarkerColorsLabel.Text = _loc.MarkerColors;
@@ -438,6 +460,22 @@ public partial class MapPage : UserControl
         if (QuestDrawerPanel?.Visibility == Visibility.Visible)
         {
             RefreshQuestDrawer();
+        }
+
+        // Refresh map selection names
+        var selectedKey = (CmbMapSelect.SelectedItem as ComboBoxItem)?.Tag as string;
+        PopulateMapComboBox();
+        if (!string.IsNullOrEmpty(selectedKey))
+        {
+            for (int i = 0; i < CmbMapSelect.Items.Count; i++)
+            {
+                if (CmbMapSelect.Items[i] is ComboBoxItem item && 
+                    string.Equals(item.Tag as string, selectedKey, StringComparison.OrdinalIgnoreCase))
+                {
+                    CmbMapSelect.SelectedIndex = i;
+                    break;
+                }
+            }
         }
     }
 
@@ -483,6 +521,7 @@ public partial class MapPage : UserControl
         CmbQuestMarkerStyle.SelectedIndex = (int)_questMarkerStyle;
         SliderQuestNameTextSize.Value = _questNameTextSize;
         ChkHideCompletedObjectives.IsChecked = _hideCompletedObjectives;
+        SliderMarkerOpacity.Value = MapSettings.Instance.MarkerOpacity;
 
         // 컨테이너 가시성 설정
         if (ExtractMarkersContainer != null)
@@ -495,6 +534,10 @@ public partial class MapPage : UserControl
 
         // Map Markers 오버레이 설정 로드
         LoadMapMarkersSettings();
+
+        // 커스텀 마커 사이드바 접힘 상태 로드
+        _isCustomMarkersPanelCollapsed = settingsService.IsCustomMarkersPanelCollapsed;
+        UpdateCustomMarkersPanelUI(_isCustomMarkersPanelCollapsed);
     }
 
     private void LoadMapMarkersSettings()
@@ -565,12 +608,12 @@ public partial class MapPage : UserControl
             var config = _trackerService.GetMapConfig(mapKey);
             CmbMapSelect.Items.Add(new ComboBoxItem
             {
-                Content = config?.DisplayName ?? mapKey,
+                Content = _loc.GetLocalizedMapName(mapKey),
                 Tag = mapKey
             });
         }
 
-        if (CmbMapSelect.Items.Count > 0)
+        if (CmbMapSelect.Items.Count > 0 && CmbMapSelect.SelectedIndex < 0)
             CmbMapSelect.SelectedIndex = 0;
     }
 
@@ -1066,6 +1109,10 @@ public partial class MapPage : UserControl
                 RefreshMapMarkers();
             }
 
+            // 커스텀 마커 새로고침
+            UpdateCustomMarkersParam();
+            _ = _customMarkerManager?.RefreshMarkersAsync();
+
             // 패널이 열려있으면 내용 갱신 (닫지 않음)
             if (QuestDrawerPanel?.Visibility == Visibility.Visible)
             {
@@ -1109,6 +1156,8 @@ public partial class MapPage : UserControl
                     RefreshExtractMarkers();
                     RefreshQuestMarkers();
                     RefreshMapMarkers();
+                    UpdateCustomMarkersParam();
+                    _customMarkerManager?.UpdateMarkerDisplay();
                 }
             }
         }
@@ -1248,6 +1297,17 @@ public partial class MapPage : UserControl
 
         // 마커 다시 그리기
         RefreshQuestMarkers();
+    }
+
+    private void SliderMarkerOpacity_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (TxtMarkerOpacity == null) return;
+        var val = (int)e.NewValue;
+        TxtMarkerOpacity.Text = $"{val}%";
+        MapSettings.Instance.MarkerOpacity = e.NewValue;
+        
+        // 커스텀 마커 즉시 갱신
+        _customMarkerManager?.UpdateMarkerDisplay();
     }
 
     private void SliderQuestNameTextSize_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -1684,8 +1744,8 @@ public partial class MapPage : UserControl
         var orig = position.OriginalPosition;
         if (orig != null)
         {
-            var angleStr = orig.Angle.HasValue ? $", Angle: {orig.Angle:F1}°" : "";
-            TxtCoordinates.Text = $"Map: {orig.MapName}, X: {orig.X:F2}, Y: {orig.Y:F2}{angleStr}";
+            var angleStr = orig.Angle.HasValue ? $", 각도: {orig.Angle:F1}°" : "";
+            TxtCoordinates.Text = $"맵: {orig.MapName}, X: {orig.X:F2}, Y: {orig.Y:F2}{angleStr}";
         }
         else
         {
@@ -1784,6 +1844,10 @@ public partial class MapPage : UserControl
             _extractMarkerManager.SetZoomLevel(_zoomLevel);
             _extractMarkerManager.UpdateMarkerScales();
         }
+
+        // 커스텀 마커 디스플레이 업데이트
+        UpdateCustomMarkersParam();
+        _customMarkerManager?.UpdateMarkerDisplay();
 
         // 컴포넌트를 통해 Map Markers 스케일 업데이트
         if (_mapMarkersManager != null)
@@ -2341,7 +2405,7 @@ public partial class MapPage : UserControl
     {
         try
         {
-            TxtStatus.Text = "Loading extract data...";
+            TxtStatus.Text = "탈출구 데이터를 불러오는 중...";
 
             await _extractService.EnsureLoadedAsync(msg =>
             {
@@ -2349,7 +2413,7 @@ public partial class MapPage : UserControl
             });
 
             var count = _extractService.AllExtracts.Count;
-            TxtStatus.Text = $"Loaded {count} extracts";
+            TxtStatus.Text = $"{count}개의 탈출구 데이터를 불러왔습니다";
 
             if (!string.IsNullOrEmpty(_currentMapKey))
             {
@@ -2358,7 +2422,7 @@ public partial class MapPage : UserControl
         }
         catch (Exception ex)
         {
-            TxtStatus.Text = $"Error loading extracts: {ex.Message}";
+            TxtStatus.Text = $"탈출구 데이터 로드 오류: {ex.Message}";
         }
     }
 
@@ -2389,12 +2453,12 @@ public partial class MapPage : UserControl
     {
         try
         {
-            TxtStatus.Text = "Loading map markers...";
+            TxtStatus.Text = "지도 마커 데이터를 불러오는 중...";
 
             await MapMarkerDbService.Instance.LoadMarkersAsync();
 
             var count = MapMarkerDbService.Instance.MarkerCount;
-            TxtStatus.Text = $"Loaded {count} map markers";
+            TxtStatus.Text = $"{count}개의 지도 마커 데이터를 불러왔습니다";
 
             if (!string.IsNullOrEmpty(_currentMapKey))
             {
@@ -2403,7 +2467,7 @@ public partial class MapPage : UserControl
         }
         catch (Exception ex)
         {
-            TxtStatus.Text = $"Error loading map markers: {ex.Message}";
+            TxtStatus.Text = $"지도 마커 데이터 로드 오류: {ex.Message}";
         }
     }
 
@@ -2829,7 +2893,7 @@ public partial class MapPage : UserControl
         if (sender is CheckBox checkBox && checkBox.Tag is TaskObjectiveWithLocation objective)
         {
             // ObjectiveId 기반 추적 + Quests 탭과 동기화를 위해 index도 함께 저장
-            _progressService.SetObjectiveCompletedById(
+            ObjectiveProgressService.Instance.SetObjectiveCompletedById(
                 objective.ObjectiveId,
                 true,
                 objective.TaskNormalizedName,
@@ -2845,7 +2909,7 @@ public partial class MapPage : UserControl
         if (sender is CheckBox checkBox && checkBox.Tag is TaskObjectiveWithLocation objective)
         {
             // ObjectiveId 기반 추적 + Quests 탭과 동기화를 위해 index도 함께 저장
-            _progressService.SetObjectiveCompletedById(
+            ObjectiveProgressService.Instance.SetObjectiveCompletedById(
                 objective.ObjectiveId,
                 false,
                 objective.TaskNormalizedName,
@@ -2913,7 +2977,7 @@ public partial class MapPage : UserControl
                     {
                         // 목표 인덱스 및 완료 상태 설정
                         taskObj.ObjectiveIndex = GetObjectiveIndex(task, taskObj.Description);
-                        taskObj.IsCompleted = _progressService.IsObjectiveCompletedById(taskObj.ObjectiveId);
+                        taskObj.IsCompleted = ObjectiveProgressService.Instance.IsObjectiveCompletedById(taskObj.ObjectiveId);
                         allObjectivesForDrawer.Add(taskObj);
                     }
                 }
@@ -3294,6 +3358,124 @@ public partial class MapPage : UserControl
         _mapMarkersManager.RefreshMarkers();
     }
 
+    private void MapViewer_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        // MapCanvas 기준의 좌표를 저장 (WPF가 역변환을 자동으로 처리함)
+        _lastRightClickPosition = e.GetPosition(MapCanvas);
+    }
+
+    #endregion
+
+    #region 커스텀 마커 이벤트 핸들러
+
+    private async void MenuAddCustomMarker_Click(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(_currentMapKey) || _customMarkerManager == null) return;
+
+        TxtStatus.Text = "마커 추가 시도 중...";
+
+        // 저장해둔 좌표 사용 (이미 MapCanvas 기준임)
+        await _customMarkerManager.AddMarkerAsync(_lastRightClickPosition.X, _lastRightClickPosition.Y);
+    }
+
+    private void LstCustomMarkers_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (LstCustomMarkers.SelectedItem is CustomMapMarker marker)
+        {
+            // 1. 층 변경 (필요한 경우)
+            if (!string.IsNullOrEmpty(marker.FloorId) && marker.FloorId != _currentFloorId)
+            {
+                // 층 변경 콤보박스 업데이트 (이벤트가 트리거됨)
+                foreach (ComboBoxItem item in CmbFloorSelect.Items)
+                {
+                    if (item.Tag?.ToString() == marker.FloorId)
+                    {
+                        CmbFloorSelect.SelectedItem = item;
+                        break;
+                    }
+                }
+            }
+
+            // 2. 해당 마커 위치로 맵 이동
+            PanToMarker(marker);
+        }
+    }
+
+    private void PanToMarker(CustomMapMarker marker)
+    {
+        if (string.IsNullOrEmpty(_currentMapKey)) return;
+
+        // 마커의 화면 좌표 계산
+        if (_trackerService?.Transformer.TryTransform(_currentMapKey, marker.X, marker.Z, null, out var screenPos) == true && screenPos != null)
+        {
+            var viewerWidth = MapViewerGrid.ActualWidth;
+            var viewerHeight = MapViewerGrid.ActualHeight;
+
+            if (viewerWidth <= 0 || viewerHeight <= 0) return;
+
+            // 마커를 중앙에 배치하기 위한 이동량 계산
+            var targetX = (viewerWidth / 2.0) - (screenPos.X * _zoomLevel);
+            var targetY = (viewerHeight / 2.0) - (screenPos.Y * _zoomLevel);
+
+            MapTranslate.X = targetX;
+            MapTranslate.Y = targetY;
+        }
+    }
+
+    private async void BtnDeleteMarker_Manual_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is CustomMapMarker marker)
+        {
+            await _customMarkerManager?.DeleteMarkerAsync(marker);
+        }
+    }
+
+    private async void BtnEditMarker_Manual_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is CustomMapMarker marker)
+        {
+            await _customMarkerManager?.EditMarkerAsync(marker);
+        }
+    }
+
+    /// <summary>
+    /// 커스텀 마커 목록 패널 토글 버튼 클릭 핸들러
+    /// </summary>
+    private void BtnToggleCustomMarkersPanel_Click(object sender, RoutedEventArgs e)
+    {
+        _isCustomMarkersPanelCollapsed = !_isCustomMarkersPanelCollapsed;
+        UpdateCustomMarkersPanelUI(_isCustomMarkersPanelCollapsed);
+        
+        // 설정 저장 (앱 재시작 시 유지용)
+        SettingsService.Instance.IsCustomMarkersPanelCollapsed = _isCustomMarkersPanelCollapsed;
+    }
+
+    /// <summary>
+    /// 커스텀 마커 사이드바의 UI 상태(너비, 가시성, 아이콘)를 업데이트합니다.
+    /// </summary>
+    private void UpdateCustomMarkersPanelUI(bool isCollapsed)
+    {
+        // 아이콘 변경
+        if (TxtToggleIcon != null)
+        {
+            TxtToggleIcon.Text = isCollapsed ? "◀" : "▶";
+        }
+
+        // 사이드바 콘텐츠 영역 너비 조정
+        if (MarkerListContentColumn != null)
+        {
+            MarkerListContentColumn.Width = isCollapsed ? new GridLength(0) : new GridLength(280);
+        }
+
+        // 전체 컨테이너 가시성 조정
+        if (MarkerListContentGrid != null)
+        {
+            MarkerListContentGrid.Visibility = isCollapsed ? Visibility.Collapsed : Visibility.Visible;
+        }
+    }
+
+
+
     #endregion
 }
 
@@ -3375,7 +3557,7 @@ public class QuestObjectiveViewModel
         // 체크박스 상태 설정 (ObjectiveId 기반 - 동일 설명 목표 개별 추적)
         if (progressService != null)
         {
-            IsChecked = progressService.IsObjectiveCompletedById(objective.ObjectiveId);
+            IsChecked = ObjectiveProgressService.Instance.IsObjectiveCompletedById(objective.ObjectiveId);
         }
         else
         {
@@ -3557,5 +3739,23 @@ public class QuestDrawerTemplateSelector : DataTemplateSelector
         if (item is QuestObjectiveViewModel)
             return ObjectiveTemplate;
         return base.SelectTemplate(item, container);
+    }
+}
+
+/// <summary>
+/// Null 또는 빈 문자열인 경우 Hidden(또는 Collapsed)으로 변환하는 컨버터
+/// </summary>
+public class NullToVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value == null) return Visibility.Collapsed;
+        if (value is string s && string.IsNullOrEmpty(s)) return Visibility.Collapsed;
+        return Visibility.Visible;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
     }
 }

@@ -64,4 +64,14 @@ public interface IMapCoordinateTransformer
     /// <param name="screenPosition">변환된 화면 좌표</param>
     /// <returns>변환 성공 여부</returns>
     bool TryTransformApiCoordinate(string mapKey, double apiX, double apiY, double? apiZ, out ScreenPosition? screenPosition);
+
+    /// <summary>
+    /// 화면 픽셀 좌표를 EFT 월드 좌표로 변환합니다.
+    /// </summary>
+    /// <param name="mapKey">맵 키</param>
+    /// <param name="screenX">화면 X (픽셀)</param>
+    /// <param name="screenY">화면 Y (픽셀)</param>
+    /// <param name="worldPosition">변환된 월드 좌표</param>
+    /// <returns>변환 성공 여부</returns>
+    bool TryTransformToWorld(string mapKey, double screenX, double screenY, out EftPosition? worldPosition);
 }

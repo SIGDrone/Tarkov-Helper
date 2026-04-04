@@ -63,7 +63,7 @@ public class MapCalibrationController
     public void EnterCalibrationMode()
     {
         _isCalibrationMode = true;
-        StatusUpdated?.Invoke("Calibration mode enabled. Drag extract markers to set calibration points.");
+        StatusUpdated?.Invoke("보정 모드 활성화. 탈출구 마커를 드래그하여 보정 포인트를 설정하세요.");
     }
 
     /// <summary>
@@ -74,7 +74,7 @@ public class MapCalibrationController
         _isCalibrationMode = false;
         _draggingExtractMarker = null;
         _draggingExtract = null;
-        StatusUpdated?.Invoke("Calibration mode disabled.");
+        StatusUpdated?.Invoke("보정 모드 비활성화.");
     }
 
     /// <summary>
@@ -104,7 +104,7 @@ public class MapCalibrationController
 
             if (config.CalibratedTransform != null)
             {
-                StatusUpdated?.Invoke($"Calibration saved! ({config.CalibrationPoints.Count} points)");
+                StatusUpdated?.Invoke($"보정 저장 완료! ({config.CalibrationPoints.Count}개 포인트)");
 
                 // 설정 저장
                 _trackerService.SaveSettings();
@@ -114,7 +114,7 @@ public class MapCalibrationController
             }
             else
             {
-                StatusUpdated?.Invoke("Calibration calculation failed.");
+                StatusUpdated?.Invoke("보정 계산 실패.");
             }
         }
         else
@@ -201,14 +201,15 @@ public class MapCalibrationController
             var hasEnough = _calibrationService.AddCalibrationPoint(config, calibrationPoint);
             var pointCount = config.CalibrationPoints?.Count ?? 0;
 
-            var statusMessage = $"Calibration point set: {_draggingExtract.Name} ({pointCount} points)";
+            var displayName = !string.IsNullOrEmpty(_draggingExtract.NameKo) ? _draggingExtract.NameKo : _draggingExtract.Name;
+            var statusMessage = $"보정 포인트 설정됨: {displayName} ({pointCount}개 포인트)";
             if (pointCount >= 3)
             {
-                statusMessage += " - Ready to apply!";
+                statusMessage += " - 적용 가능!";
             }
             else
             {
-                statusMessage += $" - Need {3 - pointCount} more points";
+                statusMessage += $" - {3 - pointCount}개의 포인트가 더 필요합니다";
             }
             StatusUpdated?.Invoke(statusMessage);
         }

@@ -109,7 +109,7 @@ namespace TarkovHelper.Pages.Components
                 RecommendationType.KappaPriority => _loc.KappaPriority,
                 RecommendationType.UnlocksMany => _loc.UnlocksMany,
                 RecommendationType.EasyQuest => _loc.EasyQuest,
-                _ => "Unknown"
+                _ => "알 수 없음"
             };
         }
 

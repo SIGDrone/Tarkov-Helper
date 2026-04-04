@@ -109,7 +109,7 @@
             <TextBox x:Name="TxtSearch" TextChanged="TxtSearch_TextChanged">
                 <TextBox.Style>
                     <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
-                        <Setter Property="Tag" Value="Search hideout modules..."/>
+                        <Setter Property="Tag" Value="은신처 모듈 검색..."/>
                     </Style>
                 </TextBox.Style>
             </TextBox>
@@ -193,11 +193,11 @@
                             <Border Background="{StaticResource BackgroundDarkBrush}"
                                     CornerRadius="4" Padding="12" Margin="0,0,0,16">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="Current Level: " FontSize="{DynamicResource FontSizeSmall}"
+                                    <TextBlock Text="현재 레벨: " FontSize="{DynamicResource FontSizeSmall}"
                                                Foreground="{StaticResource TextSecondaryBrush}"/>
                                     <TextBlock x:Name="TxtCurrentLevel" FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
                                                Foreground="{StaticResource AccentBrush}"/>
-                                    <TextBlock Text=" / Max Level: " FontSize="{DynamicResource FontSizeSmall}"
+                                    <TextBlock Text=" / 최대 레벨: " FontSize="{DynamicResource FontSizeSmall}"
                                                Foreground="{StaticResource TextSecondaryBrush}"/>
                                     <TextBlock x:Name="TxtMaxLevel" FontSize="{DynamicResource FontSizeSmall}"
                                                Foreground="{StaticResource TextPrimaryBrush}"/>
@@ -206,7 +206,7 @@
 
                             <!-- Actions -->
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                                <Button x:Name="BtnWiki" Content="Wiki" Padding="12,6"
+                                <Button x:Name="BtnWiki" Content="위키" Padding="12,6"
                                         Margin="0,0,8,0" Click="BtnWiki_Click"/>
                             </StackPanel>
 
@@ -219,7 +219,7 @@
                                         CornerRadius="4" Padding="12" Margin="0,0,0,16">
                                     <StackPanel>
                                         <!-- Items Required -->
-                                        <TextBlock x:Name="TxtItemsHeader" Text="Items:" FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
+                                        <TextBlock x:Name="TxtItemsHeader" Text="아이템:" FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
                                                    Foreground="{StaticResource TextSecondaryBrush}"
                                                    Margin="0,0,0,6"/>
                                         <ItemsControl x:Name="NextLevelItemsList" Margin="0,0,0,12">
@@ -273,7 +273,7 @@
                                         </ItemsControl>
 
                                         <!-- Traders Required -->
-                                        <TextBlock x:Name="TxtTradersHeader" Text="Traders:" FontSize="{DynamicResource FontSizeXSmall}" FontWeight="SemiBold"
+                                        <TextBlock x:Name="TxtTradersHeader" Text="상인:" FontSize="{DynamicResource FontSizeXSmall}" FontWeight="SemiBold"
                                                    Foreground="{StaticResource TextSecondaryBrush}"
                                                    Margin="0,0,0,6" Visibility="Collapsed"/>
                                         <ItemsControl x:Name="NextLevelTradersList" Margin="0,0,0,12" Visibility="Collapsed">
@@ -287,7 +287,7 @@
                                         </ItemsControl>
 
                                         <!-- Skills Required -->
-                                        <TextBlock x:Name="TxtSkillsHeader" Text="Skills:" FontSize="{DynamicResource FontSizeXSmall}" FontWeight="SemiBold"
+                                        <TextBlock x:Name="TxtSkillsHeader" Text="스킬:" FontSize="{DynamicResource FontSizeXSmall}" FontWeight="SemiBold"
                                                    Foreground="{StaticResource TextSecondaryBrush}"
                                                    Margin="0,0,0,6" Visibility="Collapsed"/>
                                         <ItemsControl x:Name="NextLevelSkillsList" Margin="0,0,0,12" Visibility="Collapsed">
@@ -301,7 +301,7 @@
                                         </ItemsControl>
 
                                         <!-- Other Modules Required -->
-                                        <TextBlock x:Name="TxtModulesHeader" Text="Other Modules:" FontSize="{DynamicResource FontSizeXSmall}" FontWeight="SemiBold"
+                                        <TextBlock x:Name="TxtModulesHeader" Text="기타 모듈:" FontSize="{DynamicResource FontSizeXSmall}" FontWeight="SemiBold"
                                                    Foreground="{StaticResource TextSecondaryBrush}"
                                                    Margin="0,0,0,6" Visibility="Collapsed"/>
                                         <ItemsControl x:Name="NextLevelModulesList" Visibility="Collapsed">
@@ -318,7 +318,7 @@
                             </StackPanel>
 
                             <!-- Total Remaining Requirements -->
-                            <TextBlock Text="Total Remaining Requirements" FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
+                            <TextBlock Text="전체 남은 요구 사항" FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
                                        Foreground="{StaticResource TextPrimaryBrush}"
                                        Margin="0,0,0,8"/>
                             <Border Background="{StaticResource BackgroundDarkBrush}"
@@ -387,7 +387,7 @@
                              Foreground="{StaticResource AccentBrush}"
                              Background="{StaticResource BackgroundMediumBrush}"/>
                 <TextBlock x:Name="LoadingStatusText"
-                           Text="Loading hideout data..."
+                           Text="은신처 데이터를 불러오는 중..."
                            FontSize="{DynamicResource FontSizeSmall}" Margin="0,16,0,0"
                            Foreground="{StaticResource TextSecondaryBrush}"
                            HorizontalAlignment="Center"/>

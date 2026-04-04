@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:sys="clr-namespace:System;assembly=mscorlib"
              xmlns:local="clr-namespace:TarkovHelper"
+             xmlns:map="clr-namespace:TarkovHelper.Pages.Map"
              ShutdownMode="OnMainWindowClose"
 >
     <Application.Resources>
@@ -22,6 +23,7 @@
 
         <!-- BoolToVisibility Converter -->
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        <map:NullToVisibilityConverter x:Key="NullToVisibilityConverter"/>
         <!-- Color Palette -->
         <Color x:Key="BackgroundDark">#1a1a1a</Color>
         <Color x:Key="BackgroundMedium">#252525</Color>

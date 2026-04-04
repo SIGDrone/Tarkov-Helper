@@ -20,16 +20,12 @@ namespace TarkovHelper.Services
         // V2 진행 데이터 (이중 키 저장)
         private QuestProgressDataV2 _progressDataV2 = new();
 
-        // Objective progress: key = "questNormalizedName:objectiveIndex", value = completed
-        private Dictionary<string, bool> _objectiveProgress = new();
-
         /// <summary>
         /// 데이터 소스 (JSON 또는 DB)
         /// </summary>
         public bool IsLoadedFromDb { get; private set; }
 
         public event EventHandler? ProgressChanged;
-        public event EventHandler<ObjectiveProgressChangedEventArgs>? ObjectiveProgressChanged;
 
         /// <summary>
         /// DB에서 퀘스트 데이터를 로드하고 초기화합니다.
@@ -168,7 +164,6 @@ namespace TarkovHelper.Services
             }
 
             LoadProgress();
-            LoadObjectiveProgress();
         }
 
         /// <summary>
@@ -985,7 +980,7 @@ namespace TarkovHelper.Services
         public void ResetAllProgress()
         {
             _questProgress.Clear();
-            _objectiveProgress.Clear();
+            ObjectiveProgressService.Instance.ClearAllProgress();
 
             // DB에서 모든 퀘스트 진행 데이터 삭제
             Task.Run(async () =>
@@ -993,7 +988,6 @@ namespace TarkovHelper.Services
                 try
                 {
                     await _userDataDb.ClearAllQuestProgressAsync();
-                    await _userDataDb.ClearAllObjectiveProgressAsync();
                     System.Diagnostics.Debug.WriteLine("[QuestProgressService] All progress cleared from DB");
                 }
                 catch (Exception ex)
@@ -1104,182 +1098,6 @@ namespace TarkovHelper.Services
             return (_allTasks.Count, locked, active, done, failed, levelLocked, unavailable);
         }
 
-        #region Objective Progress
-
-        /// <summary>
-        /// Get objective completion status
-        /// </summary>
-        public bool IsObjectiveCompleted(string questNormalizedName, int objectiveIndex)
-        {
-            var key = $"{questNormalizedName}:{objectiveIndex}";
-            return _objectiveProgress.TryGetValue(key, out var completed) && completed;
-        }
-
-        /// <summary>
-        /// Get objective completion status by objective ID
-        /// </summary>
-        public bool IsObjectiveCompletedById(string objectiveId)
-        {
-            var key = $"id:{objectiveId}";
-            return _objectiveProgress.TryGetValue(key, out var completed) && completed;
-        }
-
-        /// <summary>
-        /// Set objective completion status (index 기반 - Quests 탭용)
-        /// ObjectiveId도 함께 저장하여 Map Tracker와 동기화
-        /// </summary>
-        public void SetObjectiveCompleted(string questNormalizedName, int objectiveIndex, bool completed, string? objectiveId = null)
-        {
-            var indexKey = $"{questNormalizedName}:{objectiveIndex}";
-            var keysToSave = new List<(string Key, string? QuestId, bool IsCompleted)>();
-
-            if (completed)
-            {
-                _objectiveProgress[indexKey] = true;
-                keysToSave.Add((indexKey, questNormalizedName, true));
-                // ObjectiveId도 함께 저장 (동기화)
-                if (!string.IsNullOrEmpty(objectiveId))
-                {
-                    _objectiveProgress[$"id:{objectiveId}"] = true;
-                    keysToSave.Add(($"id:{objectiveId}", null, true));
-                }
-            }
-            else
-            {
-                _objectiveProgress.Remove(indexKey);
-                keysToSave.Add((indexKey, questNormalizedName, false));
-                // ObjectiveId도 함께 제거 (동기화)
-                if (!string.IsNullOrEmpty(objectiveId))
-                {
-                    _objectiveProgress.Remove($"id:{objectiveId}");
-                    keysToSave.Add(($"id:{objectiveId}", null, false));
-                }
-            }
-
-            // Fire-and-forget async save - don't block UI
-            _ = SaveObjectiveProgressBatchAsync(keysToSave);
-            ObjectiveProgressChanged?.Invoke(this, new ObjectiveProgressChangedEventArgs(questNormalizedName, objectiveIndex, completed));
-        }
-
-        /// <summary>
-        /// Set objective completion status by objective ID (Map Tracker용)
-        /// Index 기반 키도 함께 저장하여 Quests 탭과 동기화
-        /// </summary>
-        public void SetObjectiveCompletedById(string objectiveId, bool completed, string? questNormalizedName = null, int objectiveIndex = -1)
-        {
-            var idKey = $"id:{objectiveId}";
-            var keysToSave = new List<(string Key, string? QuestId, bool IsCompleted)>();
-
-            if (completed)
-            {
-                _objectiveProgress[idKey] = true;
-                keysToSave.Add((idKey, null, true));
-                // Index 기반 키도 함께 저장 (동기화)
-                if (!string.IsNullOrEmpty(questNormalizedName) && objectiveIndex >= 0)
-                {
-                    _objectiveProgress[$"{questNormalizedName}:{objectiveIndex}"] = true;
-                    keysToSave.Add(($"{questNormalizedName}:{objectiveIndex}", questNormalizedName, true));
-                }
-            }
-            else
-            {
-                _objectiveProgress.Remove(idKey);
-                keysToSave.Add((idKey, null, false));
-                // Index 기반 키도 함께 제거 (동기화)
-                if (!string.IsNullOrEmpty(questNormalizedName) && objectiveIndex >= 0)
-                {
-                    _objectiveProgress.Remove($"{questNormalizedName}:{objectiveIndex}");
-                    keysToSave.Add(($"{questNormalizedName}:{objectiveIndex}", questNormalizedName, false));
-                }
-            }
-
-            // Fire-and-forget async save - don't block UI
-            _ = SaveObjectiveProgressBatchAsync(keysToSave);
-            ObjectiveProgressChanged?.Invoke(this, new ObjectiveProgressChangedEventArgs(objectiveId, objectiveIndex, completed));
-        }
-
-        /// <summary>
-        /// Save objective progress in batch (fire-and-forget, doesn't block UI)
-        /// </summary>
-        private async Task SaveObjectiveProgressBatchAsync(List<(string Key, string? QuestId, bool IsCompleted)> items)
-        {
-            try
-            {
-                foreach (var item in items)
-                {
-                    if (item.IsCompleted)
-                    {
-                        await _userDataDb.SaveObjectiveProgressAsync(item.Key, item.QuestId, true);
-                    }
-                    else
-                    {
-                        await _userDataDb.DeleteObjectiveProgressAsync(item.Key);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[QuestProgressService] Failed to save objective progress: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Get all completed objective indices for a quest
-        /// </summary>
-        public HashSet<int> GetCompletedObjectives(string questNormalizedName)
-        {
-            var result = new HashSet<int>();
-            var prefix = $"{questNormalizedName}:";
-
-            foreach (var kvp in _objectiveProgress)
-            {
-                if (kvp.Key.StartsWith(prefix) && kvp.Value)
-                {
-                    var indexStr = kvp.Key.Substring(prefix.Length);
-                    if (int.TryParse(indexStr, out var index))
-                    {
-                        result.Add(index);
-                    }
-                }
-            }
-
-            return result;
-        }
-
-        /// <summary>
-        /// Clear all objective progress for a quest
-        /// </summary>
-        public void ClearObjectiveProgress(string questNormalizedName)
-        {
-            var prefix = $"{questNormalizedName}:";
-            var keysToRemove = _objectiveProgress.Keys.Where(k => k.StartsWith(prefix)).ToList();
-
-            foreach (var key in keysToRemove)
-            {
-                _objectiveProgress.Remove(key);
-            }
-
-            if (keysToRemove.Count > 0)
-            {
-                SaveObjectiveProgress();
-                ObjectiveProgressChanged?.Invoke(this, new ObjectiveProgressChangedEventArgs(questNormalizedName, -1, false));
-            }
-        }
-
-        /// <summary>
-        /// Get objective completion count for a quest
-        /// </summary>
-        public (int Completed, int Total) GetObjectiveProgress(TarkovTask task)
-        {
-            if (task.NormalizedName == null || task.Objectives == null)
-                return (0, 0);
-
-            var completedSet = GetCompletedObjectives(task.NormalizedName);
-            return (completedSet.Count, task.Objectives.Count);
-        }
-
-        #endregion
-
         #region Persistence
 
         private readonly UserDataDbService _userDataDb = UserDataDbService.Instance;
@@ -1315,9 +1133,6 @@ namespace TarkovHelper.Services
             }
         }
 
-        /// <summary>
-        /// 단일 퀘스트 진행 상태를 DB에 저장
-        /// </summary>
         private void SaveSingleQuestProgress(string normalizedName, QuestStatus status)
         {
             Task.Run(async () =>
@@ -1339,9 +1154,6 @@ namespace TarkovHelper.Services
             });
         }
 
-        /// <summary>
-        /// 단일 퀘스트 진행 상태를 DB에서 삭제
-        /// </summary>
         private void DeleteSingleQuestProgress(string normalizedName)
         {
             Task.Run(async () =>
@@ -1365,11 +1177,8 @@ namespace TarkovHelper.Services
 
         private void LoadProgress()
         {
-            // Task.Run으로 데드락 방지
-            // 마이그레이션은 MainWindow에서 먼저 수행됨
             Task.Run(async () =>
             {
-                // DB에서 로드
                 await LoadProgressFromDbAsync();
             }).GetAwaiter().GetResult();
         }
@@ -1396,118 +1205,6 @@ namespace TarkovHelper.Services
             }
         }
 
-        private void SaveObjectiveProgress()
-        {
-            // DB에 저장 (Task.Run으로 데드락 방지)
-            Task.Run(async () => await SaveObjectiveProgressToDbAsync()).GetAwaiter().GetResult();
-        }
-
-        private async Task SaveObjectiveProgressToDbAsync()
-        {
-            try
-            {
-                foreach (var kvp in _objectiveProgress)
-                {
-                    // 키 형식: "questName:index" 또는 "id:objectiveId"
-                    string? questId = null;
-                    if (kvp.Key.Contains(':'))
-                    {
-                        var parts = kvp.Key.Split(':');
-                        if (parts[0] != "id")
-                        {
-                            questId = parts[0];
-                        }
-                    }
-
-                    await _userDataDb.SaveObjectiveProgressAsync(kvp.Key, questId, kvp.Value);
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[QuestProgressService] Failed to save objective progress to DB: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// 단일 목표 진행 상태를 DB에 저장
-        /// </summary>
-        private void SaveSingleObjectiveProgress(string key, bool isCompleted, string? questId = null)
-        {
-            Task.Run(async () =>
-            {
-                try
-                {
-                    await _userDataDb.SaveObjectiveProgressAsync(key, questId, isCompleted);
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[QuestProgressService] Failed to save single objective progress: {ex.Message}");
-                }
-            });
-        }
-
-        /// <summary>
-        /// 단일 목표 진행 상태를 DB에서 삭제
-        /// </summary>
-        private void DeleteSingleObjectiveProgress(string key)
-        {
-            Task.Run(async () =>
-            {
-                try
-                {
-                    await _userDataDb.DeleteObjectiveProgressAsync(key);
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[QuestProgressService] Failed to delete objective progress: {ex.Message}");
-                }
-            });
-        }
-
-        private void LoadObjectiveProgress()
-        {
-            // DB에서 로드 (Task.Run으로 데드락 방지)
-            Task.Run(async () => await LoadObjectiveProgressFromDbAsync()).GetAwaiter().GetResult();
-        }
-
-        private async Task LoadObjectiveProgressFromDbAsync()
-        {
-            try
-            {
-                var dbProgress = await _userDataDb.LoadObjectiveProgressAsync();
-
-                _objectiveProgress.Clear();
-                foreach (var kvp in dbProgress)
-                {
-                    _objectiveProgress[kvp.Key] = kvp.Value;
-                }
-
-                System.Diagnostics.Debug.WriteLine($"[QuestProgressService] Loaded {_objectiveProgress.Count} objective progress from DB");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[QuestProgressService] Failed to load objective progress from DB: {ex.Message}");
-                _objectiveProgress.Clear();
-            }
-        }
-
         #endregion
-    }
-
-    /// <summary>
-    /// Event args for objective progress changes
-    /// </summary>
-    public class ObjectiveProgressChangedEventArgs : EventArgs
-    {
-        public string QuestNormalizedName { get; }
-        public int ObjectiveIndex { get; }
-        public bool IsCompleted { get; }
-
-        public ObjectiveProgressChangedEventArgs(string questNormalizedName, int objectiveIndex, bool isCompleted)
-        {
-            QuestNormalizedName = questNormalizedName;
-            ObjectiveIndex = objectiveIndex;
-            IsCompleted = isCompleted;
-        }
     }
 }

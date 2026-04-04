@@ -1,7 +1,7 @@
 <Window x:Class="TarkovHelper.Windows.SyncResultDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Quest Sync Result"
+        Title="퀘스트 동기화 결과"
         WindowStartupLocation="CenterOwner"
         WindowStyle="None"
         AllowsTransparency="True"
@@ -31,7 +31,7 @@
 
             <!-- Header -->
             <Grid Grid.Row="0" Margin="0,0,0,16">
-                <TextBlock x:Name="TxtTitle" Text="Quest Sync Complete" FontSize="{DynamicResource FontSizeXLarge}" FontWeight="SemiBold"
+                <TextBlock x:Name="TxtTitle" Text="퀘스트 동기화 완료" FontSize="{DynamicResource FontSizeXLarge}" FontWeight="SemiBold"
                            Foreground="{DynamicResource AccentBrush}"/>
                 <Button x:Name="BtnClose" Content="X"
                         HorizontalAlignment="Right"
@@ -57,7 +57,7 @@
                         </Grid.RowDefinitions>
                         <Border Grid.Row="0" Background="{DynamicResource BackgroundLightBrush}"
                                 CornerRadius="4,4,0,0" Padding="12,8">
-                            <TextBlock x:Name="TxtCompletedHeader" Text="Completed Quests (0)"
+                            <TextBlock x:Name="TxtCompletedHeader" Text="완료된 퀘스트 (0)"
                                        FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextPrimaryBrush}"/>
                         </Border>
@@ -88,7 +88,7 @@
                                                         CornerRadius="3" Padding="4,2"
                                                         VerticalAlignment="Center"
                                                         Visibility="{Binding IsPrerequisite, Converter={StaticResource BoolToVisibilityConverter}}">
-                                                    <TextBlock Text="Auto" FontSize="{DynamicResource FontSizeTiny}"
+                                                    <TextBlock Text="자동" FontSize="{DynamicResource FontSizeTiny}"
                                                                Foreground="{DynamicResource BackgroundDarkBrush}"/>
                                                 </Border>
                                             </Grid>
@@ -110,7 +110,7 @@
                         </Grid.RowDefinitions>
                         <Border Grid.Row="0" Background="{DynamicResource BackgroundLightBrush}"
                                 CornerRadius="4,4,0,0" Padding="12,8">
-                            <TextBlock x:Name="TxtInProgressHeader" Text="In Progress (0)"
+                            <TextBlock x:Name="TxtInProgressHeader" Text="진행 중 (0)"
                                        FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextPrimaryBrush}"/>
                         </Border>
@@ -160,7 +160,7 @@
                             <TextBlock Text="" FontSize="{DynamicResource FontSizeSmall}"
                                        Foreground="#FFA726" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock x:Name="TxtAlternativeHeader"
-                                       Text="Optional Quests - Choose One Per Group"
+                                       Text="선택 퀘스트 - 그룹당 하나를 선택하세요"
                                        FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextPrimaryBrush}"/>
                         </StackPanel>
@@ -192,11 +192,11 @@
                                                                 <TextBlock Text="{Binding QuestName}"
                                                                            FontSize="{DynamicResource FontSizeXSmall}"
                                                                            Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                                                <TextBlock Text=" (Done)"
+                                                                <TextBlock Text=" (완료)"
                                                                            FontSize="{DynamicResource FontSizeTiny}"
                                                                            Foreground="{DynamicResource AccentBrush}"
                                                                            Visibility="{Binding IsCompleted, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                                                                <TextBlock Text=" (Failed)"
+                                                                <TextBlock Text=" (실패)"
                                                                            FontSize="{DynamicResource FontSizeTiny}"
                                                                            Foreground="#EF5350"
                                                                            Visibility="{Binding IsFailed, Converter={StaticResource BoolToVisibilityConverter}}"/>
@@ -219,7 +219,7 @@
                     CornerRadius="4" Padding="12,8" Margin="0,0,0,16">
                 <StackPanel>
                     <TextBlock x:Name="TxtSummaryLabel"
-                               Text="Summary:"
+                               Text="요약:"
                                FontSize="{DynamicResource FontSizeXSmall}" FontWeight="SemiBold"
                                Foreground="{DynamicResource TextPrimaryBrush}"
                                Margin="0,0,0,4"/>
@@ -233,10 +233,10 @@
 
             <!-- Action Buttons -->
             <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button x:Name="BtnCancel" Content="Cancel"
+                <Button x:Name="BtnCancel" Content="취소"
                         Padding="16,8" Margin="0,0,8,0"
                         Click="BtnCancel_Click"/>
-                <Button x:Name="BtnConfirm" Content="Confirm"
+                <Button x:Name="BtnConfirm" Content="확인"
                         Padding="16,8"
                         Click="BtnConfirm_Click"
                         Background="{DynamicResource AccentBrush}"

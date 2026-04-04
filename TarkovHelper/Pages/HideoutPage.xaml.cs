@@ -292,19 +292,7 @@ namespace TarkovHelper.Pages
 
         private (string DisplayName, string Subtitle, bool ShowSubtitle) GetLocalizedNames(HideoutModule module)
         {
-            var lang = _loc.CurrentLanguage;
-
-            if (lang == AppLanguage.EN)
-            {
-                return (module.Name, string.Empty, false);
-            }
-
-            var localizedName = lang switch
-            {
-                AppLanguage.KO => module.NameKo,
-                AppLanguage.JA => module.NameJa,
-                _ => null
-            };
+            var localizedName = module.NameKo;
 
             if (!string.IsNullOrEmpty(localizedName))
             {
@@ -347,9 +335,8 @@ namespace TarkovHelper.Pages
                 {
                     var matchName = vm.Module.Name?.ToLowerInvariant().Contains(searchText) == true;
                     var matchKo = vm.Module.NameKo?.ToLowerInvariant().Contains(searchText) == true;
-                    var matchJa = vm.Module.NameJa?.ToLowerInvariant().Contains(searchText) == true;
 
-                    if (!matchName && !matchKo && !matchJa)
+                    if (!matchName && !matchKo)
                         return false;
                 }
 
@@ -362,11 +349,11 @@ namespace TarkovHelper.Pages
         private void UpdateStatistics()
         {
             var stats = _progressService.GetStatistics();
-            TxtStats.Text = $"Modules: {stats.TotalModules} | " +
-                           $"Completed: {stats.FullyCompleted} | " +
-                           $"In Progress: {stats.InProgress} | " +
-                           $"Not Started: {stats.NotStarted} | " +
-                           $"Levels: {stats.CompletedLevels}/{stats.TotalLevels}";
+            TxtStats.Text = $"모듈: {stats.TotalModules} | " +
+                           $"완료: {stats.FullyCompleted} | " +
+                           $"진행 중: {stats.InProgress} | " +
+                           $"시작 안 함: {stats.NotStarted} | " +
+                           $"레벨: {stats.CompletedLevels}/{stats.TotalLevels}";
         }
 
         private void TxtSearch_TextChanged(object sender, TextChangedEventArgs e)
@@ -441,7 +428,7 @@ namespace TarkovHelper.Pages
             if (nextLevel != null)
             {
                 NextLevelSection.Visibility = Visibility.Visible;
-                TxtNextLevelHeader.Text = $"Next Level Requirements (Lv.{nextLevel.Level})";
+                TxtNextLevelHeader.Text = $"다음 레벨 요구 사항 (레벨 {nextLevel.Level})";
 
                 // Items
                 if (nextLevel.ItemRequirements.Count > 0)
@@ -573,7 +560,7 @@ namespace TarkovHelper.Pages
             }
             else
             {
-                TotalRemainingItemsList.ItemsSource = new[] { new RequirementViewModel { DisplayText = "All items collected!" } };
+                TotalRemainingItemsList.ItemsSource = new[] { new RequirementViewModel { DisplayText = "모든 아이템을 수집했습니다!" } };
             }
         }
 
@@ -608,42 +595,22 @@ namespace TarkovHelper.Pages
 
         private string GetLocalizedItemName(HideoutItemRequirement item)
         {
-            return _loc.CurrentLanguage switch
-            {
-                AppLanguage.KO => item.ItemNameKo ?? item.ItemName,
-                AppLanguage.JA => item.ItemNameJa ?? item.ItemName,
-                _ => item.ItemName
-            };
+            return item.ItemNameKo ?? item.ItemName;
         }
 
         private string GetLocalizedTraderName(HideoutTraderRequirement trader)
         {
-            return _loc.CurrentLanguage switch
-            {
-                AppLanguage.KO => trader.TraderNameKo ?? trader.TraderName,
-                AppLanguage.JA => trader.TraderNameJa ?? trader.TraderName,
-                _ => trader.TraderName
-            };
+            return trader.TraderNameKo ?? trader.TraderName;
         }
 
         private string GetLocalizedSkillName(HideoutSkillRequirement skill)
         {
-            return _loc.CurrentLanguage switch
-            {
-                AppLanguage.KO => skill.NameKo ?? skill.Name,
-                AppLanguage.JA => skill.NameJa ?? skill.Name,
-                _ => skill.Name
-            };
+            return skill.NameKo ?? skill.Name;
         }
 
         private string GetLocalizedStationName(HideoutStationRequirement station)
         {
-            return _loc.CurrentLanguage switch
-            {
-                AppLanguage.KO => station.StationNameKo ?? station.StationName,
-                AppLanguage.JA => station.StationNameJa ?? station.StationName,
-                _ => station.StationName
-            };
+            return station.StationNameKo ?? station.StationName;
         }
 
         private void BtnWiki_Click(object sender, RoutedEventArgs e)
@@ -665,6 +632,18 @@ namespace TarkovHelper.Pages
             {
                 // Ignore errors opening browser
             }
+        }
+
+        /// <summary>
+        /// 데이터를 강제로 다시 로드 (프로필 전환 시 사용)
+        /// </summary>
+        public async Task ReloadDataAsync()
+        {
+            await LoadModulesAsync();
+            ApplyFilters();
+            UpdateStatistics();
+            UpdateDetailPanel();
+            _ = LoadModuleIconsInBackgroundAsync();
         }
 
         #region Cross-Tab Navigation

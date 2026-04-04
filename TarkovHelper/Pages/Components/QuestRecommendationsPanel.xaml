@@ -9,7 +9,7 @@
     <Expander x:Name="RecommendationsExpander" IsExpanded="False" Visibility="Collapsed">
         <Expander.Header>
             <StackPanel Orientation="Horizontal">
-                <TextBlock x:Name="TxtRecommendationsHeader" Text="Recommended Quests"
+                <TextBlock x:Name="TxtRecommendationsHeader" Text="추천 퀘스트"
                            FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
                            Foreground="{DynamicResource AccentBrush}"
                            VerticalAlignment="Center"/>
@@ -26,7 +26,7 @@
                 CornerRadius="6" Padding="12" Margin="0,8,0,0">
             <StackPanel>
                 <!-- No Recommendations Message -->
-                <TextBlock x:Name="TxtNoRecommendations" Text="No recommendations at this time"
+                <TextBlock x:Name="TxtNoRecommendations" Text="현재 추천된 퀘스트가 없습니다"
                            FontSize="{DynamicResource FontSizeXSmall}"
                            Foreground="{DynamicResource TextSecondaryBrush}"
                            HorizontalAlignment="Center" Margin="0,8"
@@ -78,7 +78,7 @@
                                                     Background="#9C27B0"
                                                     VerticalAlignment="Center" Margin="6,0,0,0"
                                                     Visibility="{Binding KappaBadgeVisibility}"
-                                                    ToolTip="Required for Kappa Container">
+                                                    ToolTip="카파 컨테이너 필수 퀘스트">
                                                 <TextBlock Text="κ" FontSize="{DynamicResource FontSizeTiny}"
                                                            Foreground="White" FontWeight="Bold"/>
                                             </Border>

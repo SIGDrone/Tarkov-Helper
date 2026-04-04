@@ -306,6 +306,15 @@ namespace TarkovHelper.Services
             ProgressChanged?.Invoke(this, EventArgs.Empty);
         }
 
+        /// <summary>
+        /// 강제로 진행도를 다시 로드 (프로필 전환 시 사용)
+        /// </summary>
+        public void ReloadProgress()
+        {
+            LoadProgress();
+            ProgressChanged?.Invoke(this, EventArgs.Empty);
+        }
+
         #region Persistence
 
         private void SaveProgress()

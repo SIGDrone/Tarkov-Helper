@@ -556,7 +556,7 @@ namespace TarkovHelper.Services
                 .OrderBy(f => File.GetLastWriteTime(f))
                 .ToList();
 
-            progress?.Report($"Found {logFiles.Count} log files");
+            progress?.Report($"로그 파일 {logFiles.Count}개를 찾았습니다");
 
             int processed = 0;
             foreach (var file in logFiles)
@@ -567,7 +567,7 @@ namespace TarkovHelper.Services
                     allEvents.AddRange(events);
 
                     processed++;
-                    progress?.Report($"Parsed {processed}/{logFiles.Count} files ({allEvents.Count} events)");
+                    progress?.Report($"{processed}/{logFiles.Count}개 파일 분석 중 ({allEvents.Count}개 이벤트)");
                 }
                 catch
                 {
@@ -768,7 +768,7 @@ namespace TarkovHelper.Services
             var result = new SyncResult();
 
             _log.Info($"Starting sync from: {logFolderPath}");
-            progress?.Report("Scanning log files...");
+            progress?.Report("로그 파일 스캔 중...");
 
             // Parse all log files
             var events = await ParseLogDirectoryAsync(logFolderPath, progress);
@@ -780,18 +780,18 @@ namespace TarkovHelper.Services
                 var cutoffDate = DateTime.Now.AddDays(-daysRange);
                 var originalCount = events.Count;
                 events = events.Where(e => e.Timestamp >= cutoffDate).ToList();
-                progress?.Report($"Filtered to {events.Count}/{originalCount} events from last {daysRange} days");
+                progress?.Report($"최근 {daysRange}일 동안의 이벤트 {events.Count}/{originalCount}개로 필터링됨");
             }
 
             result.TotalEventsFound = events.Count;
 
             if (events.Count == 0)
             {
-                result.Errors.Add("No quest events found in logs");
+                result.Errors.Add("로그에서 퀘스트 이벤트를 찾을 수 없습니다");
                 return result;
             }
 
-            progress?.Report($"Processing {events.Count} quest events...");
+            progress?.Report($"{events.Count}개의 퀘스트 이벤트 분석 중...");
 
             // Get task data
             var progressService = QuestProgressService.Instance;
@@ -981,7 +981,7 @@ namespace TarkovHelper.Services
                 }
             }
 
-            progress?.Report($"Found {questsToComplete.Count} quests to update");
+            progress?.Report($"업데이트할 퀘스트 {questsToComplete.Count}개를 찾았습니다");
 
             _log.Info($"Sync complete: {result.TotalEventsFound} events, {result.QuestsToComplete.Count} to complete, {result.InProgressQuests.Count} in progress, {result.UnmatchedQuestIds.Count} unmatched");
 

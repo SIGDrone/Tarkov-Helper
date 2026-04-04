@@ -430,83 +430,39 @@ namespace TarkovHelper.Services
 
         private string GetReadyToCompleteReason(TarkovTask quest, List<(QuestItem, int)> readyItems)
         {
-            var lang = LocalizationService.Instance.CurrentLanguage;
-
             if (readyItems.Count > 0)
             {
-                return lang switch
-                {
-                    AppLanguage.KO => $"필요 아이템 {readyItems.Count}개 보유 중",
-                    AppLanguage.JA => $"必要アイテム{readyItems.Count}個所持中",
-                    _ => $"Have all {readyItems.Count} required item(s)"
-                };
+                return $"필요 아이템 {readyItems.Count}개 보유 중";
             }
 
-            return lang switch
-            {
-                AppLanguage.KO => "지금 바로 완료 가능",
-                AppLanguage.JA => "今すぐ完了可能",
-                _ => "Ready to complete now"
-            };
+            return "지금 바로 완료 가능";
         }
 
         private string GetItemHandInReason(TarkovTask quest, List<(QuestItem, int)> ready, List<(QuestItem, int)> missing)
         {
-            var lang = LocalizationService.Instance.CurrentLanguage;
             var total = ready.Count + missing.Count;
 
-            return lang switch
-            {
-                AppLanguage.KO => $"아이템 제출만 필요 ({ready.Count}/{total}개 보유)",
-                AppLanguage.JA => $"アイテム提出のみ ({ready.Count}/{total}個所持)",
-                _ => $"Item hand-in only ({ready.Count}/{total} owned)"
-            };
+            return $"아이템 제출만 필요 ({ready.Count}/{total}개 보유)";
         }
 
         private string GetKappaReason(TarkovTask quest, int unlocksCount)
         {
-            var lang = LocalizationService.Instance.CurrentLanguage;
-
             if (unlocksCount > 0)
             {
-                return lang switch
-                {
-                    AppLanguage.KO => $"카파 필수 + {unlocksCount}개 퀘스트 해금",
-                    AppLanguage.JA => $"Kappa必須 + {unlocksCount}クエスト解放",
-                    _ => $"Kappa required + unlocks {unlocksCount} quest(s)"
-                };
+                return $"카파 필수 + {unlocksCount}개 퀘스트 해금";
             }
 
-            return lang switch
-            {
-                AppLanguage.KO => "카파 컨테이너 필수 퀘스트",
-                AppLanguage.JA => "Kappaコンテナ必須クエスト",
-                _ => "Required for Kappa container"
-            };
+            return "카파 컨테이너 필수 퀘스트";
         }
 
         private string GetUnlocksReason(TarkovTask quest, int unlocksCount)
         {
-            var lang = LocalizationService.Instance.CurrentLanguage;
-
-            return lang switch
-            {
-                AppLanguage.KO => $"{unlocksCount}개 퀘스트 해금",
-                AppLanguage.JA => $"{unlocksCount}クエスト解放",
-                _ => $"Unlocks {unlocksCount} quest(s)"
-            };
+            return $"{unlocksCount}개 퀘스트 해금";
         }
 
         private string GetEasyQuestReason(TarkovTask quest)
         {
-            var lang = LocalizationService.Instance.CurrentLanguage;
-
-            return lang switch
-            {
-                AppLanguage.KO => "아이템 필요 없음",
-                AppLanguage.JA => "アイテム不要",
-                _ => "No items required"
-            };
+            return "아이템 필요 없음";
         }
     }
 }

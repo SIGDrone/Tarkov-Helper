@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using TarkovHelper.Debug;
 using TarkovHelper.Models;
+using TarkovHelper.Models.Map;
 
 namespace TarkovHelper.Services;
 
@@ -81,45 +82,58 @@ public sealed class UserDataDbService
 
     private async Task CreateTablesAsync(SqliteConnection connection)
     {
-        // First, check and fix ItemInventory schema if needed
-        await MigrateItemInventorySchemaAsync(connection);
+        // First, check for schema migration to ProfileType system
+        await MigrateToProfileSystemAsync(connection);
+        
+        // Ensure CustomMarkers has necessary columns
+        await MigrateCustomMarkersSchemaAsync(connection);
 
         var createTablesSql = @"
             -- 퀘스트 진행 상태
             CREATE TABLE IF NOT EXISTS QuestProgress (
-                Id TEXT PRIMARY KEY,
+                Id TEXT,
+                ProfileType INTEGER NOT NULL DEFAULT 0,
                 NormalizedName TEXT,
                 Status TEXT NOT NULL,
-                UpdatedAt TEXT NOT NULL
+                UpdatedAt TEXT NOT NULL,
+                PRIMARY KEY (Id, ProfileType)
             );
 
             -- 퀘스트 목표 진행 상태
             CREATE TABLE IF NOT EXISTS ObjectiveProgress (
-                Id TEXT PRIMARY KEY,
+                Id TEXT,
+                ProfileType INTEGER NOT NULL DEFAULT 0,
                 QuestId TEXT,
                 IsCompleted INTEGER NOT NULL DEFAULT 0,
-                UpdatedAt TEXT NOT NULL
+                UpdatedAt TEXT NOT NULL,
+                PRIMARY KEY (Id, ProfileType)
             );
 
             -- 아이템 인벤토리
             CREATE TABLE IF NOT EXISTS ItemInventory (
-                ItemNormalizedName TEXT PRIMARY KEY,
+                ItemNormalizedName TEXT,
+                ProfileType INTEGER NOT NULL DEFAULT 0,
                 FirQuantity INTEGER NOT NULL DEFAULT 0,
                 NonFirQuantity INTEGER NOT NULL DEFAULT 0,
-                UpdatedAt TEXT NOT NULL
+                UpdatedAt TEXT NOT NULL,
+                PRIMARY KEY (ItemNormalizedName, ProfileType)
             );
 
             -- 하이드아웃 진행
             CREATE TABLE IF NOT EXISTS HideoutProgress (
-                StationId TEXT PRIMARY KEY,
+                StationId TEXT,
+                ProfileType INTEGER NOT NULL DEFAULT 0,
                 Level INTEGER NOT NULL DEFAULT 0,
-                UpdatedAt TEXT NOT NULL
+                UpdatedAt TEXT NOT NULL,
+                PRIMARY KEY (StationId, ProfileType)
             );
 
-            -- 사용자 설정
+            -- 사용자 설정 (일부 설정은 프로필별로 관리)
             CREATE TABLE IF NOT EXISTS UserSettings (
-                Key TEXT PRIMARY KEY,
-                Value TEXT NOT NULL
+                Key TEXT,
+                ProfileType INTEGER NOT NULL DEFAULT 0,
+                Value TEXT NOT NULL,
+                PRIMARY KEY (Key, ProfileType)
             );
 
             -- 레이드 히스토리
@@ -147,16 +161,71 @@ public sealed class UserDataDbService
                 CreatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
+            -- 커스텀 맵 마커
+            CREATE TABLE IF NOT EXISTS CustomMapMarkers (
+                Id TEXT,
+                ProfileType INTEGER NOT NULL DEFAULT 0,
+                MapKey TEXT NOT NULL,
+                Name TEXT,
+                X REAL NOT NULL,
+                Y REAL NOT NULL,
+                Z REAL NOT NULL,
+                FloorId TEXT,
+                Color TEXT,
+                Size REAL NOT NULL DEFAULT 24.0,
+                Opacity REAL NOT NULL DEFAULT 1.0,
+                CreatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (Id, ProfileType)
+            );
+
             -- 인덱스
             CREATE INDEX IF NOT EXISTS idx_quest_progress_normalized ON QuestProgress(NormalizedName);
             CREATE INDEX IF NOT EXISTS idx_objective_progress_quest ON ObjectiveProgress(QuestId);
             CREATE INDEX IF NOT EXISTS idx_raid_history_start_time ON RaidHistory(StartTime);
             CREATE INDEX IF NOT EXISTS idx_raid_history_map_key ON RaidHistory(MapKey);
             CREATE INDEX IF NOT EXISTS idx_raid_history_raid_type ON RaidHistory(RaidType);
+            CREATE INDEX IF NOT EXISTS idx_custom_markers_map_key ON CustomMapMarkers(MapKey);
         ";
 
         await using var cmd = new SqliteCommand(createTablesSql, connection);
         await cmd.ExecuteNonQueryAsync();
+    }
+
+    /// <summary>
+    /// 기존 단일 프로필 시스템에서 PVP/PVE 통합 프로필 시스템으로 마이그레이션합니다.
+    /// </summary>
+    private async Task MigrateToProfileSystemAsync(SqliteConnection connection)
+    {
+        var tablesToMigrate = new[] { "QuestProgress", "ObjectiveProgress", "ItemInventory", "HideoutProgress", "UserSettings", "CustomMapMarkers" };
+
+        foreach (var tableName in tablesToMigrate)
+        {
+            try
+            {
+                // ProfileType 컬럼이 있는지 확인
+                var checkColumnSql = $"SELECT COUNT(*) FROM pragma_table_info('{tableName}') WHERE name='ProfileType'";
+                await using var checkCmd = new SqliteCommand(checkColumnSql, connection);
+                var hasProfileType = Convert.ToInt32(await checkCmd.ExecuteScalarAsync()) > 0;
+
+                if (!hasProfileType)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[UserDataDbService] Migrating {tableName} to Profile system...");
+                    
+                    // SQLite에서 PK가 포함된 컬럼 변경은 테이블 재생성이 가장 안전함
+                    // 여기서는 단순히 컬럼을 추가하고 기존 데이터를 PVP(0)로 설정하는 방식으로 진행 (이후 테이블 생성 SQL에서 IF NOT EXISTS로 커버)
+                    var addColumnSql = $"ALTER TABLE {tableName} ADD COLUMN ProfileType INTEGER NOT NULL DEFAULT 0";
+                    await using var addCmd = new SqliteCommand(addColumnSql, connection);
+                    await addCmd.ExecuteNonQueryAsync();
+                    
+                    System.Diagnostics.Debug.WriteLine($"[UserDataDbService] {tableName} migrated successfully");
+                }
+            }
+            catch (Exception ex)
+            {
+                // 이미 존재하거나 테이블이 없는 경우 무시
+                System.Diagnostics.Debug.WriteLine($"[UserDataDbService] Migration warning for {tableName}: {ex.Message}");
+            }
+        }
     }
 
     /// <summary>
@@ -204,6 +273,49 @@ public sealed class UserDataDbService
         }
     }
 
+    private async Task MigrateCustomMarkersSchemaAsync(SqliteConnection connection)
+    {
+        try
+        {
+            var checkTableSql = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='CustomMapMarkers'";
+            await using var checkCmd = new SqliteCommand(checkTableSql, connection);
+            var tableExists = Convert.ToInt32(await checkCmd.ExecuteScalarAsync()) > 0;
+
+            if (!tableExists) return;
+
+            var checkColumnSql = "SELECT COUNT(*) FROM pragma_table_info('CustomMapMarkers') WHERE name='Size'";
+            await using var checkColCmd = new SqliteCommand(checkColumnSql, connection);
+            var columnExists = Convert.ToInt32(await checkColCmd.ExecuteScalarAsync()) > 0;
+
+            if (!columnExists)
+            {
+                System.Diagnostics.Debug.WriteLine("[UserDataDbService] Adding 'Size' column to CustomMapMarkers table...");
+                var migrateSql = "ALTER TABLE CustomMapMarkers ADD COLUMN Size REAL NOT NULL DEFAULT 24.0";
+                await using var migrateCmd = new SqliteCommand(migrateSql, connection);
+                await migrateCmd.ExecuteNonQueryAsync();
+                System.Diagnostics.Debug.WriteLine("[UserDataDbService] CustomMapMarkers table migrated successfully (Size)");
+            }
+
+            // Check for 'Opacity' column
+            var checkOpacitySql = "SELECT COUNT(*) FROM pragma_table_info('CustomMapMarkers') WHERE name='Opacity'";
+            await using var checkOpCmd = new SqliteCommand(checkOpacitySql, connection);
+            var opacityExists = Convert.ToInt32(await checkOpCmd.ExecuteScalarAsync()) > 0;
+
+            if (!opacityExists)
+            {
+                System.Diagnostics.Debug.WriteLine("[UserDataDbService] Adding 'Opacity' column to CustomMapMarkers table...");
+                var migrateSql = "ALTER TABLE CustomMapMarkers ADD COLUMN Opacity REAL NOT NULL DEFAULT 1.0";
+                await using var migrateCmd = new SqliteCommand(migrateSql, connection);
+                await migrateCmd.ExecuteNonQueryAsync();
+                System.Diagnostics.Debug.WriteLine("[UserDataDbService] CustomMapMarkers table migrated successfully (Opacity)");
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[UserDataDbService] CustomMapMarkers schema migration failed: {ex.Message}");
+        }
+    }
+
     #region Quest Progress
 
     /// <summary>
@@ -212,6 +324,7 @@ public sealed class UserDataDbService
     public async Task<Dictionary<string, QuestStatus>> LoadQuestProgressAsync()
     {
         await InitializeAsync();
+        var profileType = ProfileService.Instance.CurrentProfile;
 
         var result = new Dictionary<string, QuestStatus>(StringComparer.OrdinalIgnoreCase);
 
@@ -219,8 +332,9 @@ public sealed class UserDataDbService
         await using var connection = new SqliteConnection(connectionString);
         await connection.OpenAsync();
 
-        var sql = "SELECT Id, NormalizedName, Status FROM QuestProgress";
+        var sql = "SELECT Id, NormalizedName, Status FROM QuestProgress WHERE ProfileType = @profileType";
         await using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("@profileType", (int)profileType);
         await using var reader = await cmd.ExecuteReaderAsync();
 
         while (await reader.ReadAsync())
@@ -246,21 +360,23 @@ public sealed class UserDataDbService
     public async Task SaveQuestProgressAsync(string id, string? normalizedName, QuestStatus status)
     {
         await InitializeAsync();
+        var profileType = ProfileService.Instance.CurrentProfile;
 
         var connectionString = $"Data Source={_databasePath}";
         await using var connection = new SqliteConnection(connectionString);
         await connection.OpenAsync();
 
         var sql = @"
-            INSERT INTO QuestProgress (Id, NormalizedName, Status, UpdatedAt)
-            VALUES (@id, @normalizedName, @status, @updatedAt)
-            ON CONFLICT(Id) DO UPDATE SET
+            INSERT INTO QuestProgress (Id, ProfileType, NormalizedName, Status, UpdatedAt)
+            VALUES (@id, @profileType, @normalizedName, @status, @updatedAt)
+            ON CONFLICT(Id, ProfileType) DO UPDATE SET
                 NormalizedName = @normalizedName,
                 Status = @status,
                 UpdatedAt = @updatedAt";
 
         await using var cmd = new SqliteCommand(sql, connection);
         cmd.Parameters.AddWithValue("@id", id);
+        cmd.Parameters.AddWithValue("@profileType", (int)profileType);
         cmd.Parameters.AddWithValue("@normalizedName", normalizedName ?? (object)DBNull.Value);
         cmd.Parameters.AddWithValue("@status", status.ToString());
         cmd.Parameters.AddWithValue("@updatedAt", DateTime.UtcNow.ToString("o"));
@@ -274,6 +390,7 @@ public sealed class UserDataDbService
     public async Task SaveQuestProgressBatchAsync(IEnumerable<(string Id, string? NormalizedName, QuestStatus Status)> progressItems)
     {
         await InitializeAsync();
+        var profileType = ProfileService.Instance.CurrentProfile;
 
         var connectionString = $"Data Source={_databasePath}";
         await using var connection = new SqliteConnection(connectionString);
@@ -283,9 +400,9 @@ public sealed class UserDataDbService
         try
         {
             var sql = @"
-                INSERT INTO QuestProgress (Id, NormalizedName, Status, UpdatedAt)
-                VALUES (@id, @normalizedName, @status, @updatedAt)
-                ON CONFLICT(Id) DO UPDATE SET
+                INSERT INTO QuestProgress (Id, ProfileType, NormalizedName, Status, UpdatedAt)
+                VALUES (@id, @profileType, @normalizedName, @status, @updatedAt)
+                ON CONFLICT(Id, ProfileType) DO UPDATE SET
                     NormalizedName = @normalizedName,
                     Status = @status,
                     UpdatedAt = @updatedAt";
@@ -296,6 +413,7 @@ public sealed class UserDataDbService
             {
                 await using var cmd = new SqliteCommand(sql, connection, (SqliteTransaction)transaction);
                 cmd.Parameters.AddWithValue("@id", item.Id);
+                cmd.Parameters.AddWithValue("@profileType", (int)profileType);
                 cmd.Parameters.AddWithValue("@normalizedName", item.NormalizedName ?? (object)DBNull.Value);
                 cmd.Parameters.AddWithValue("@status", item.Status.ToString());
                 cmd.Parameters.AddWithValue("@updatedAt", updatedAt);
@@ -317,14 +435,16 @@ public sealed class UserDataDbService
     public async Task DeleteQuestProgressAsync(string id)
     {
         await InitializeAsync();
+        var profileType = ProfileService.Instance.CurrentProfile;
 
         var connectionString = $"Data Source={_databasePath}";
         await using var connection = new SqliteConnection(connectionString);
         await connection.OpenAsync();
 
-        var sql = "DELETE FROM QuestProgress WHERE Id = @id OR NormalizedName = @id";
+        var sql = "DELETE FROM QuestProgress WHERE (Id = @id OR NormalizedName = @id) AND ProfileType = @profileType";
         await using var cmd = new SqliteCommand(sql, connection);
         cmd.Parameters.AddWithValue("@id", id);
+        cmd.Parameters.AddWithValue("@profileType", (int)profileType);
 
         await cmd.ExecuteNonQueryAsync();
     }
@@ -335,12 +455,14 @@ public sealed class UserDataDbService
     public async Task ClearAllQuestProgressAsync()
     {
         await InitializeAsync();
+        var profileType = ProfileService.Instance.CurrentProfile;
 
         var connectionString = $"Data Source={_databasePath}";
         await using var connection = new SqliteConnection(connectionString);
         await connection.OpenAsync();
 
-        await using var cmd = new SqliteCommand("DELETE FROM QuestProgress", connection);
+        await using var cmd = new SqliteCommand("DELETE FROM QuestProgress WHERE ProfileType = @profileType", connection);
+        cmd.Parameters.AddWithValue("@profileType", (int)profileType);
         await cmd.ExecuteNonQueryAsync();
     }
 
@@ -354,6 +476,7 @@ public sealed class UserDataDbService
     public async Task<Dictionary<string, bool>> LoadObjectiveProgressAsync()
     {
         await InitializeAsync();
+        var profileType = ProfileService.Instance.CurrentProfile;
 
         var result = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
 
@@ -361,8 +484,9 @@ public sealed class UserDataDbService
         await using var connection = new SqliteConnection(connectionString);
         await connection.OpenAsync();
 
-        var sql = "SELECT Id, IsCompleted FROM ObjectiveProgress";
+        var sql = "SELECT Id, IsCompleted FROM ObjectiveProgress WHERE ProfileType = @profileType";
         await using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("@profileType", (int)profileType);
         await using var reader = await cmd.ExecuteReaderAsync();
 
         while (await reader.ReadAsync())
@@ -381,21 +505,23 @@ public sealed class UserDataDbService
     public async Task SaveObjectiveProgressAsync(string id, string? questId, bool isCompleted)
     {
         await InitializeAsync();
+        var profileType = ProfileService.Instance.CurrentProfile;
 
         var connectionString = $"Data Source={_databasePath}";
         await using var connection = new SqliteConnection(connectionString);
         await connection.OpenAsync();
 
         var sql = @"
-            INSERT INTO ObjectiveProgress (Id, QuestId, IsCompleted, UpdatedAt)
-            VALUES (@id, @questId, @isCompleted, @updatedAt)
-            ON CONFLICT(Id) DO UPDATE SET
+            INSERT INTO ObjectiveProgress (Id, ProfileType, QuestId, IsCompleted, UpdatedAt)
+            VALUES (@id, @profileType, @questId, @isCompleted, @updatedAt)
+            ON CONFLICT(Id, ProfileType) DO UPDATE SET
                 QuestId = @questId,
                 IsCompleted = @isCompleted,
                 UpdatedAt = @updatedAt";
 
         await using var cmd = new SqliteCommand(sql, connection);
         cmd.Parameters.AddWithValue("@id", id);
+        cmd.Parameters.AddWithValue("@profileType", (int)profileType);
         cmd.Parameters.AddWithValue("@questId", questId ?? (object)DBNull.Value);
         cmd.Parameters.AddWithValue("@isCompleted", isCompleted ? 1 : 0);
         cmd.Parameters.AddWithValue("@updatedAt", DateTime.UtcNow.ToString("o"));
@@ -409,14 +535,16 @@ public sealed class UserDataDbService
     public async Task DeleteObjectiveProgressAsync(string id)
     {
         await InitializeAsync();
+        var profileType = ProfileService.Instance.CurrentProfile;
 
         var connectionString = $"Data Source={_databasePath}";
         await using var connection = new SqliteConnection(connectionString);
         await connection.OpenAsync();
 
-        var sql = "DELETE FROM ObjectiveProgress WHERE Id = @id";
+        var sql = "DELETE FROM ObjectiveProgress WHERE Id = @id AND ProfileType = @profileType";
         await using var cmd = new SqliteCommand(sql, connection);
         cmd.Parameters.AddWithValue("@id", id);
+        cmd.Parameters.AddWithValue("@profileType", (int)profileType);
 
         await cmd.ExecuteNonQueryAsync();
     }
@@ -427,15 +555,17 @@ public sealed class UserDataDbService
     public async Task DeleteObjectiveProgressByQuestAsync(string questId)
     {
         await InitializeAsync();
+        var profileType = ProfileService.Instance.CurrentProfile;
 
         var connectionString = $"Data Source={_databasePath}";
         await using var connection = new SqliteConnection(connectionString);
         await connection.OpenAsync();
 
-        var sql = "DELETE FROM ObjectiveProgress WHERE QuestId = @questId OR Id LIKE @pattern";
+        var sql = "DELETE FROM ObjectiveProgress WHERE (QuestId = @questId OR Id LIKE @pattern) AND ProfileType = @profileType";
         await using var cmd = new SqliteCommand(sql, connection);
         cmd.Parameters.AddWithValue("@questId", questId);
         cmd.Parameters.AddWithValue("@pattern", $"{questId}:%");
+        cmd.Parameters.AddWithValue("@profileType", (int)profileType);
 
         await cmd.ExecuteNonQueryAsync();
     }
@@ -446,12 +576,14 @@ public sealed class UserDataDbService
     public async Task ClearAllObjectiveProgressAsync()
     {
         await InitializeAsync();
+        var profileType = ProfileService.Instance.CurrentProfile;
 
         var connectionString = $"Data Source={_databasePath}";
         await using var connection = new SqliteConnection(connectionString);
         await connection.OpenAsync();
 
-        await using var cmd = new SqliteCommand("DELETE FROM ObjectiveProgress", connection);
+        await using var cmd = new SqliteCommand("DELETE FROM ObjectiveProgress WHERE ProfileType = @profileType", connection);
+        cmd.Parameters.AddWithValue("@profileType", (int)profileType);
         await cmd.ExecuteNonQueryAsync();
     }
 
@@ -465,6 +597,7 @@ public sealed class UserDataDbService
     public async Task<Dictionary<string, int>> LoadHideoutProgressAsync()
     {
         await InitializeAsync();
+        var profileType = ProfileService.Instance.CurrentProfile;
 
         var result = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
@@ -472,8 +605,9 @@ public sealed class UserDataDbService
         await using var connection = new SqliteConnection(connectionString);
         await connection.OpenAsync();
 
-        var sql = "SELECT StationId, Level FROM HideoutProgress";
+        var sql = "SELECT StationId, Level FROM HideoutProgress WHERE ProfileType = @profileType";
         await using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("@profileType", (int)profileType);
         await using var reader = await cmd.ExecuteReaderAsync();
 
         while (await reader.ReadAsync())
@@ -492,6 +626,7 @@ public sealed class UserDataDbService
     public async Task SaveHideoutProgressAsync(string stationId, int level)
     {
         await InitializeAsync();
+        var profileType = ProfileService.Instance.CurrentProfile;
 
         var connectionString = $"Data Source={_databasePath}";
         await using var connection = new SqliteConnection(connectionString);
@@ -500,22 +635,24 @@ public sealed class UserDataDbService
         // 레벨이 0이면 삭제
         if (level == 0)
         {
-            var deleteSql = "DELETE FROM HideoutProgress WHERE StationId = @stationId";
+            var deleteSql = "DELETE FROM HideoutProgress WHERE StationId = @stationId AND ProfileType = @profileType";
             await using var deleteCmd = new SqliteCommand(deleteSql, connection);
             deleteCmd.Parameters.AddWithValue("@stationId", stationId);
+            deleteCmd.Parameters.AddWithValue("@profileType", (int)profileType);
             await deleteCmd.ExecuteNonQueryAsync();
             return;
         }
 
         var sql = @"
-            INSERT INTO HideoutProgress (StationId, Level, UpdatedAt)
-            VALUES (@stationId, @level, @updatedAt)
-            ON CONFLICT(StationId) DO UPDATE SET
+            INSERT INTO HideoutProgress (StationId, ProfileType, Level, UpdatedAt)
+            VALUES (@stationId, @profileType, @level, @updatedAt)
+            ON CONFLICT(StationId, ProfileType) DO UPDATE SET
                 Level = @level,
                 UpdatedAt = @updatedAt";
 
         await using var cmd = new SqliteCommand(sql, connection);
         cmd.Parameters.AddWithValue("@stationId", stationId);
+        cmd.Parameters.AddWithValue("@profileType", (int)profileType);
         cmd.Parameters.AddWithValue("@level", level);
         cmd.Parameters.AddWithValue("@updatedAt", DateTime.UtcNow.ToString("o"));
 
@@ -528,12 +665,14 @@ public sealed class UserDataDbService
     public async Task ClearAllHideoutProgressAsync()
     {
         await InitializeAsync();
+        var profileType = ProfileService.Instance.CurrentProfile;
 
         var connectionString = $"Data Source={_databasePath}";
         await using var connection = new SqliteConnection(connectionString);
         await connection.OpenAsync();
 
-        await using var cmd = new SqliteCommand("DELETE FROM HideoutProgress", connection);
+        await using var cmd = new SqliteCommand("DELETE FROM HideoutProgress WHERE ProfileType = @profileType", connection);
+        cmd.Parameters.AddWithValue("@profileType", (int)profileType);
         await cmd.ExecuteNonQueryAsync();
     }
 
@@ -547,6 +686,7 @@ public sealed class UserDataDbService
     public async Task<Dictionary<string, (int FirQuantity, int NonFirQuantity)>> LoadItemInventoryAsync()
     {
         await InitializeAsync();
+        var profileType = ProfileService.Instance.CurrentProfile;
 
         var result = new Dictionary<string, (int FirQuantity, int NonFirQuantity)>(StringComparer.OrdinalIgnoreCase);
 
@@ -554,8 +694,9 @@ public sealed class UserDataDbService
         await using var connection = new SqliteConnection(connectionString);
         await connection.OpenAsync();
 
-        var sql = "SELECT ItemNormalizedName, FirQuantity, NonFirQuantity FROM ItemInventory";
+        var sql = "SELECT ItemNormalizedName, FirQuantity, NonFirQuantity FROM ItemInventory WHERE ProfileType = @profileType";
         await using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("@profileType", (int)profileType);
         await using var reader = await cmd.ExecuteReaderAsync();
 
         while (await reader.ReadAsync())
@@ -575,6 +716,7 @@ public sealed class UserDataDbService
     public async Task SaveItemInventoryAsync(string itemNormalizedName, int firQuantity, int nonFirQuantity)
     {
         await InitializeAsync();
+        var profileType = ProfileService.Instance.CurrentProfile;
 
         var connectionString = $"Data Source={_databasePath}";
         await using var connection = new SqliteConnection(connectionString);
@@ -583,23 +725,25 @@ public sealed class UserDataDbService
         // 둘 다 0이면 삭제
         if (firQuantity == 0 && nonFirQuantity == 0)
         {
-            var deleteSql = "DELETE FROM ItemInventory WHERE ItemNormalizedName = @itemName";
+            var deleteSql = "DELETE FROM ItemInventory WHERE ItemNormalizedName = @itemName AND ProfileType = @profileType";
             await using var deleteCmd = new SqliteCommand(deleteSql, connection);
             deleteCmd.Parameters.AddWithValue("@itemName", itemNormalizedName);
+            deleteCmd.Parameters.AddWithValue("@profileType", (int)profileType);
             await deleteCmd.ExecuteNonQueryAsync();
             return;
         }
 
         var sql = @"
-            INSERT INTO ItemInventory (ItemNormalizedName, FirQuantity, NonFirQuantity, UpdatedAt)
-            VALUES (@itemName, @firQty, @nonFirQty, @updatedAt)
-            ON CONFLICT(ItemNormalizedName) DO UPDATE SET
+            INSERT INTO ItemInventory (ItemNormalizedName, ProfileType, FirQuantity, NonFirQuantity, UpdatedAt)
+            VALUES (@itemName, @profileType, @firQty, @nonFirQty, @updatedAt)
+            ON CONFLICT(ItemNormalizedName, ProfileType) DO UPDATE SET
                 FirQuantity = @firQty,
                 NonFirQuantity = @nonFirQty,
                 UpdatedAt = @updatedAt";
 
         await using var cmd = new SqliteCommand(sql, connection);
         cmd.Parameters.AddWithValue("@itemName", itemNormalizedName);
+        cmd.Parameters.AddWithValue("@profileType", (int)profileType);
         cmd.Parameters.AddWithValue("@firQty", firQuantity);
         cmd.Parameters.AddWithValue("@nonFirQty", nonFirQuantity);
         cmd.Parameters.AddWithValue("@updatedAt", DateTime.UtcNow.ToString("o"));
@@ -613,12 +757,14 @@ public sealed class UserDataDbService
     public async Task ClearAllItemInventoryAsync()
     {
         await InitializeAsync();
+        var profileType = ProfileService.Instance.CurrentProfile;
 
         var connectionString = $"Data Source={_databasePath}";
         await using var connection = new SqliteConnection(connectionString);
         await connection.OpenAsync();
 
-        await using var cmd = new SqliteCommand("DELETE FROM ItemInventory", connection);
+        await using var cmd = new SqliteCommand("DELETE FROM ItemInventory WHERE ProfileType = @profileType", connection);
+        cmd.Parameters.AddWithValue("@profileType", (int)profileType);
         await cmd.ExecuteNonQueryAsync();
     }
 
@@ -916,14 +1062,16 @@ public sealed class UserDataDbService
     public async Task<string?> GetSettingAsync(string key)
     {
         await InitializeAsync();
+        var profileType = ProfileService.Instance.CurrentProfile;
 
         var connectionString = $"Data Source={_databasePath};Mode=ReadOnly";
         await using var connection = new SqliteConnection(connectionString);
         await connection.OpenAsync();
 
-        var sql = "SELECT Value FROM UserSettings WHERE Key = @key";
+        var sql = "SELECT Value FROM UserSettings WHERE Key = @key AND ProfileType = @profileType";
         await using var cmd = new SqliteCommand(sql, connection);
         cmd.Parameters.AddWithValue("@key", key);
+        cmd.Parameters.AddWithValue("@profileType", (int)profileType);
 
         var result = await cmd.ExecuteScalarAsync();
         return result as string;
@@ -935,18 +1083,20 @@ public sealed class UserDataDbService
     public async Task SetSettingAsync(string key, string value)
     {
         await InitializeAsync();
+        var profileType = ProfileService.Instance.CurrentProfile;
 
         var connectionString = $"Data Source={_databasePath}";
         await using var connection = new SqliteConnection(connectionString);
         await connection.OpenAsync();
 
         var sql = @"
-            INSERT INTO UserSettings (Key, Value)
-            VALUES (@key, @value)
-            ON CONFLICT(Key) DO UPDATE SET Value = @value";
+            INSERT INTO UserSettings (Key, ProfileType, Value)
+            VALUES (@key, @profileType, @value)
+            ON CONFLICT(Key, ProfileType) DO UPDATE SET Value = @value";
 
         await using var cmd = new SqliteCommand(sql, connection);
         cmd.Parameters.AddWithValue("@key", key);
+        cmd.Parameters.AddWithValue("@profileType", (int)profileType);
         cmd.Parameters.AddWithValue("@value", value);
 
         await cmd.ExecuteNonQueryAsync();
@@ -958,14 +1108,16 @@ public sealed class UserDataDbService
     public async Task DeleteSettingAsync(string key)
     {
         await InitializeAsync();
+        var profileType = ProfileService.Instance.CurrentProfile;
 
         var connectionString = $"Data Source={_databasePath}";
         await using var connection = new SqliteConnection(connectionString);
         await connection.OpenAsync();
 
-        var sql = "DELETE FROM UserSettings WHERE Key = @key";
+        var sql = "DELETE FROM UserSettings WHERE Key = @key AND ProfileType = @profileType";
         await using var cmd = new SqliteCommand(sql, connection);
         cmd.Parameters.AddWithValue("@key", key);
+        cmd.Parameters.AddWithValue("@profileType", (int)profileType);
 
         await cmd.ExecuteNonQueryAsync();
     }
@@ -976,6 +1128,7 @@ public sealed class UserDataDbService
     public async Task<Dictionary<string, string>> GetAllSettingsAsync()
     {
         await InitializeAsync();
+        var profileType = ProfileService.Instance.CurrentProfile;
 
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -983,8 +1136,9 @@ public sealed class UserDataDbService
         await using var connection = new SqliteConnection(connectionString);
         await connection.OpenAsync();
 
-        var sql = "SELECT Key, Value FROM UserSettings";
+        var sql = "SELECT Key, Value FROM UserSettings WHERE ProfileType = @profileType";
         await using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("@profileType", (int)profileType);
         await using var reader = await cmd.ExecuteReaderAsync();
 
         while (await reader.ReadAsync())
@@ -1006,14 +1160,16 @@ public sealed class UserDataDbService
         {
             InitializeAsync().GetAwaiter().GetResult();
         }
+        var profileType = ProfileService.Instance.CurrentProfile;
 
         var connectionString = $"Data Source={_databasePath};Mode=ReadOnly";
         using var connection = new SqliteConnection(connectionString);
         connection.Open();
 
-        var sql = "SELECT Value FROM UserSettings WHERE Key = @key";
+        var sql = "SELECT Value FROM UserSettings WHERE Key = @key AND ProfileType = @profileType";
         using var cmd = new SqliteCommand(sql, connection);
         cmd.Parameters.AddWithValue("@key", key);
+        cmd.Parameters.AddWithValue("@profileType", (int)profileType);
 
         var result = cmd.ExecuteScalar();
         return result as string;
@@ -1028,18 +1184,20 @@ public sealed class UserDataDbService
         {
             InitializeAsync().GetAwaiter().GetResult();
         }
+        var profileType = ProfileService.Instance.CurrentProfile;
 
         var connectionString = $"Data Source={_databasePath}";
         using var connection = new SqliteConnection(connectionString);
         connection.Open();
 
         var sql = @"
-            INSERT INTO UserSettings (Key, Value)
-            VALUES (@key, @value)
-            ON CONFLICT(Key) DO UPDATE SET Value = @value";
+            INSERT INTO UserSettings (Key, ProfileType, Value)
+            VALUES (@key, @profileType, @value)
+            ON CONFLICT(Key, ProfileType) DO UPDATE SET Value = @value";
 
         using var cmd = new SqliteCommand(sql, connection);
         cmd.Parameters.AddWithValue("@key", key);
+        cmd.Parameters.AddWithValue("@profileType", (int)profileType);
         cmd.Parameters.AddWithValue("@value", value);
 
         cmd.ExecuteNonQuery();
@@ -1056,6 +1214,7 @@ public sealed class UserDataDbService
         Func<string, string?>? getNormalizedName = null)
     {
         await InitializeAsync();
+        var profileType = ProfileService.Instance.CurrentProfile;
 
         var connectionString = $"Data Source={_databasePath}";
         await using var connection = new SqliteConnection(connectionString);
@@ -1066,9 +1225,9 @@ public sealed class UserDataDbService
         try
         {
             var sql = @"
-                INSERT INTO QuestProgress (Id, NormalizedName, Status, UpdatedAt)
-                VALUES (@id, @normalizedName, @status, @updatedAt)
-                ON CONFLICT(Id) DO UPDATE SET
+                INSERT INTO QuestProgress (Id, ProfileType, NormalizedName, Status, UpdatedAt)
+                VALUES (@id, @profileType, @normalizedName, @status, @updatedAt)
+                ON CONFLICT(Id, ProfileType) DO UPDATE SET
                     NormalizedName = @normalizedName,
                     Status = @status,
                     UpdatedAt = @updatedAt";
@@ -1079,6 +1238,7 @@ public sealed class UserDataDbService
                 var normalizedName = getNormalizedName?.Invoke(kvp.Key) ?? kvp.Key;
 
                 cmd.Parameters.AddWithValue("@id", kvp.Key);
+                cmd.Parameters.AddWithValue("@profileType", (int)profileType);
                 cmd.Parameters.AddWithValue("@normalizedName", normalizedName);
                 cmd.Parameters.AddWithValue("@status", kvp.Value.ToString());
                 cmd.Parameters.AddWithValue("@updatedAt", DateTime.UtcNow.ToString("o"));
@@ -1271,6 +1431,117 @@ public sealed class UserDataDbService
 
         var deleted = await cmd.ExecuteNonQueryAsync();
         System.Diagnostics.Debug.WriteLine($"[UserDataDbService] Cleaned up {deleted} old raid history entries");
+    }
+
+    #endregion
+
+    #region Custom Map Markers
+
+    /// <summary>
+    /// 특정 맵의 모든 커스텀 마커 로드
+    /// </summary>
+    public async Task<List<CustomMapMarker>> LoadCustomMarkersAsync(string mapKey)
+    {
+        await InitializeAsync();
+        var profileType = ProfileService.Instance.CurrentProfile;
+
+        var result = new List<CustomMapMarker>();
+
+        var connectionString = $"Data Source={_databasePath};Mode=ReadOnly";
+        await using var connection = new SqliteConnection(connectionString);
+        await connection.OpenAsync();
+
+        var sql = "SELECT Id, MapKey, Name, X, Y, Z, FloorId, Color, Size, Opacity, CreatedAt FROM CustomMapMarkers WHERE MapKey = @mapKey AND ProfileType = @profileType";
+        await using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("@mapKey", mapKey);
+        cmd.Parameters.AddWithValue("@profileType", (int)profileType);
+
+        await using var reader = await cmd.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            var marker = new CustomMapMarker
+            {
+                Id = reader.GetString(0),
+                MapKey = reader.GetString(1),
+                Name = reader.IsDBNull(2) ? "" : reader.GetString(2),
+                X = reader.GetDouble(3),
+                Y = reader.GetDouble(4),
+                Z = reader.GetDouble(5),
+                FloorId = reader.IsDBNull(6) ? null : reader.GetString(6),
+                Color = reader.IsDBNull(7) ? null : reader.GetString(7),
+                Size = reader.GetDouble(8),
+                Opacity = reader.IsDBNull(9) ? 1.0 : reader.GetDouble(9),
+                CreatedAt = DateTime.Parse(reader.GetString(10))
+            };
+            result.Add(marker);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// 커스텀 마커 저장/업데이트
+    /// </summary>
+    public async Task SaveCustomMarkerAsync(CustomMapMarker marker)
+    {
+        await InitializeAsync();
+        var profileType = ProfileService.Instance.CurrentProfile;
+
+        var connectionString = $"Data Source={_databasePath}";
+        await using var connection = new SqliteConnection(connectionString);
+        await connection.OpenAsync();
+
+        var sql = @"
+            INSERT INTO CustomMapMarkers (Id, ProfileType, MapKey, Name, X, Y, Z, FloorId, Color, Size, Opacity, CreatedAt)
+            VALUES (@id, @profileType, @mapKey, @name, @x, @y, @z, @floorId, @color, @size, @opacity, @createdAt)
+            ON CONFLICT(Id, ProfileType) DO UPDATE SET
+                MapKey = @mapKey,
+                Name = @name,
+                X = @x,
+                Y = @y,
+                Z = @z,
+                FloorId = @floorId,
+                Color = @color,
+                Size = @size,
+                Opacity = @opacity,
+                CreatedAt = @createdAt";
+
+        await using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("@id", marker.Id);
+        cmd.Parameters.AddWithValue("@profileType", (int)profileType);
+        cmd.Parameters.AddWithValue("@mapKey", marker.MapKey);
+        cmd.Parameters.AddWithValue("@name", marker.Name ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("@x", marker.X);
+        cmd.Parameters.AddWithValue("@y", marker.Y);
+        cmd.Parameters.AddWithValue("@z", marker.Z);
+        cmd.Parameters.AddWithValue("@floorId", marker.FloorId ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("@color", marker.Color ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("@size", marker.Size);
+        cmd.Parameters.AddWithValue("@opacity", marker.Opacity);
+        cmd.Parameters.AddWithValue("@createdAt", marker.CreatedAt.ToString("o"));
+
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    /// <summary>
+    /// 커스텀 마커 삭제
+    /// </summary>
+    public async Task DeleteCustomMarkerAsync(string id)
+    {
+        await InitializeAsync();
+        var profileType = ProfileService.Instance.CurrentProfile;
+
+        var connectionString = $"Data Source={_databasePath}";
+        await using var connection = new SqliteConnection(connectionString);
+        await connection.OpenAsync();
+
+        var sql = "DELETE FROM CustomMapMarkers WHERE Id = @id AND ProfileType = @profileType";
+        await using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("@id", id);
+        cmd.Parameters.AddWithValue("@profileType", (int)profileType);
+
+        await cmd.ExecuteNonQueryAsync();
     }
 
     #endregion

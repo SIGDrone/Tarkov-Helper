@@ -1,7 +1,7 @@
 <Window x:Class="TarkovHelper.Windows.InProgressQuestInputDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="In-Progress Quest Input"
+        Title="진행 중인 퀘스트 입력"
         WindowStartupLocation="CenterOwner"
         WindowStyle="None"
         AllowsTransparency="True"
@@ -26,7 +26,7 @@
 
             <!-- Header -->
             <Grid Grid.Row="0" Margin="0,0,0,16">
-                <TextBlock x:Name="TxtTitle" Text="Enter In-Progress Quests" FontSize="{DynamicResource FontSizeXLarge}" FontWeight="SemiBold"
+                <TextBlock x:Name="TxtTitle" Text="진행 중인 퀘스트 입력" FontSize="{DynamicResource FontSizeXLarge}" FontWeight="SemiBold"
                            Foreground="{DynamicResource AccentBrush}"/>
                 <Button x:Name="BtnClose" Content="X"
                         HorizontalAlignment="Right"
@@ -55,7 +55,7 @@
                         <!-- Header -->
                         <Border Grid.Row="0" Background="{DynamicResource BackgroundLightBrush}"
                                 CornerRadius="4,4,0,0" Padding="12,8">
-                            <TextBlock x:Name="TxtQuestSelectionHeader" Text="Quest Selection"
+                            <TextBlock x:Name="TxtQuestSelectionHeader" Text="퀘스트 선택"
                                        FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextPrimaryBrush}"/>
                         </Border>
@@ -72,7 +72,7 @@
 
                             <!-- Trader Filter -->
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock x:Name="TxtTraderFilterLabel" Text="Trader:"
+                                <TextBlock x:Name="TxtTraderFilterLabel" Text="상인:"
                                            FontSize="{DynamicResource FontSizeXSmall}"
                                            Foreground="{DynamicResource TextSecondaryBrush}"
                                            VerticalAlignment="Center" Margin="0,0,8,0"/>
@@ -133,14 +133,14 @@
                         <!-- Header -->
                         <Border Grid.Row="0" Background="{DynamicResource BackgroundLightBrush}"
                                 CornerRadius="4,4,0,0" Padding="12,8">
-                            <TextBlock x:Name="TxtPrerequisitesHeader" Text="Prerequisites Preview"
+                            <TextBlock x:Name="TxtPrerequisitesHeader" Text="선행 퀘스트 미리보기"
                                        FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextPrimaryBrush}"/>
                         </Border>
 
                         <!-- Description -->
                         <TextBlock x:Name="TxtPrerequisitesDesc" Grid.Row="1"
-                                   Text="Prerequisites of selected quests will be shown here.&#x0a;These will be auto-completed on apply."
+                                   Text="선택한 퀘스트의 선행 퀘스트가 여기에 표시됩니다.&#x0a;적용 시 자동으로 완료 처리됩니다."
                                    FontSize="{DynamicResource FontSizeTiny}" Margin="12,8"
                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                    TextWrapping="Wrap"/>
@@ -187,12 +187,12 @@
                     CornerRadius="4" Padding="12,8" Margin="0,0,0,16">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock x:Name="TxtSelectedQuestsCount"
-                               Text="Selected quests: 0"
+                               Text="선택된 퀘스트: 0"
                                FontSize="{DynamicResource FontSizeXSmall}"
                                Foreground="{DynamicResource TextPrimaryBrush}"
                                Margin="0,0,24,0"/>
                     <TextBlock x:Name="TxtPrerequisitesCount"
-                               Text="Prerequisites to complete: 0"
+                               Text="완료될 선행 퀘스트: 0"
                                FontSize="{DynamicResource FontSizeXSmall}"
                                Foreground="{DynamicResource TextSecondaryBrush}"/>
                 </StackPanel>
@@ -200,10 +200,10 @@
 
             <!-- Action Buttons -->
             <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button x:Name="BtnCancel" Content="Cancel"
+                <Button x:Name="BtnCancel" Content="취소"
                         Padding="16,8" Margin="0,0,8,0"
                         Click="BtnCancel_Click"/>
-                <Button x:Name="BtnApply" Content="Apply"
+                <Button x:Name="BtnApply" Content="적용"
                         Padding="16,8"
                         Click="BtnApply_Click"
                         Background="{DynamicResource AccentBrush}"

@@ -83,63 +83,17 @@ public partial class SyncResultDialog : Window
         var prereqCount = _result.QuestsToComplete.Count(q => q.IsPrerequisite);
         var inProgressCount = _result.InProgressQuests.Count;
 
-        TxtTitle.Text = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => "퀘스트 동기화 완료",
-            AppLanguage.JA => "クエスト同期完了",
-            _ => "Quest Sync Complete"
-        };
-
-        TxtCompletedHeader.Text = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => $"완료된 퀘스트 ({_result.QuestsToComplete.Count})",
-            AppLanguage.JA => $"完了したクエスト ({_result.QuestsToComplete.Count})",
-            _ => $"Completed Quests ({_result.QuestsToComplete.Count})"
-        };
-
-        TxtInProgressHeader.Text = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => $"진행중 퀘스트 ({inProgressCount})",
-            AppLanguage.JA => $"進行中のクエスト ({inProgressCount})",
-            _ => $"In Progress ({inProgressCount})"
-        };
-
-        TxtSummaryLabel.Text = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => "요약:",
-            AppLanguage.JA => "概要:",
-            _ => "Summary:"
-        };
-
-        TxtStats.Text = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => $"├─ 로그에서 발견된 이벤트: {_result.TotalEventsFound}\n├─ 자동 완료된 선행 퀘스트: {prereqCount}\n└─ 매칭 실패한 퀘스트 ID: {_result.UnmatchedQuestIds.Count}",
-            AppLanguage.JA => $"├─ ログで見つかったイベント: {_result.TotalEventsFound}\n├─ 自動完了した前提クエスト: {prereqCount}\n└─ マッチング失敗したクエストID: {_result.UnmatchedQuestIds.Count}",
-            _ => $"├─ Events found in logs: {_result.TotalEventsFound}\n├─ Prerequisites auto-completed: {prereqCount}\n└─ Unmatched quest IDs: {_result.UnmatchedQuestIds.Count}"
-        };
-
-        BtnCancel.Content = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => "취소",
-            AppLanguage.JA => "キャンセル",
-            _ => "Cancel"
-        };
-
-        BtnConfirm.Content = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => "확인",
-            AppLanguage.JA => "確認",
-            _ => "Confirm"
-        };
+        TxtTitle.Text = "퀘스트 동기화 완료";
+        TxtCompletedHeader.Text = $"완료된 퀘스트 ({_result.QuestsToComplete.Count})";
+        TxtInProgressHeader.Text = $"진행중 퀘스트 ({inProgressCount})";
+        TxtSummaryLabel.Text = "요약:";
+        TxtStats.Text = $"├─ 로그에서 발견된 이벤트: {_result.TotalEventsFound}\n├─ 자동 완료된 선행 퀘스트: {prereqCount}\n└─ 매칭 실패한 퀘스트 ID: {_result.UnmatchedQuestIds.Count}";
+        BtnCancel.Content = "취소";
+        BtnConfirm.Content = "확인";
 
         if (_result.AlternativeQuestGroups.Count > 0)
         {
-            TxtAlternativeHeader.Text = _loc.CurrentLanguage switch
-            {
-                AppLanguage.KO => $"선택 필요 퀘스트 - 그룹당 하나 선택 ({_result.AlternativeQuestGroups.Count}개 그룹)",
-                AppLanguage.JA => $"選択が必要なクエスト - グループごとに1つ選択 ({_result.AlternativeQuestGroups.Count}グループ)",
-                _ => $"Optional Quests - Choose One Per Group ({_result.AlternativeQuestGroups.Count} groups)"
-            };
+            TxtAlternativeHeader.Text = $"선택 필요 퀘스트 - 그룹당 하나 선택 ({_result.AlternativeQuestGroups.Count}개 그룹)";
         }
     }
 
@@ -148,12 +102,7 @@ public partial class SyncResultDialog : Window
         var vm = new AlternativeQuestGroupViewModel
         {
             OriginalGroup = group,
-            GroupLabel = _loc.CurrentLanguage switch
-            {
-                AppLanguage.KO => $"선택 그룹: {string.Join(" / ", group.Choices.Select(c => c.Task.Name))}",
-                AppLanguage.JA => $"選択グループ: {string.Join(" / ", group.Choices.Select(c => c.Task.Name))}",
-                _ => $"Choose one: {string.Join(" / ", group.Choices.Select(c => c.Task.Name))}"
-            }
+            GroupLabel = $"선택 그룹: {string.Join(" / ", group.Choices.Select(c => c.Task.Name))}"
         };
 
         foreach (var choice in group.Choices)

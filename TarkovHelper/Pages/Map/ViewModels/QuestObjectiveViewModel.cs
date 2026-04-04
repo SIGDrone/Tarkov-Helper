@@ -85,7 +85,7 @@ public class QuestObjectiveViewModel
         // 체크박스 상태 설정 (ObjectiveId 기반 - 동일 설명 목표 개별 추적)
         if (progressService != null)
         {
-            IsChecked = progressService.IsObjectiveCompletedById(objective.ObjectiveId);
+            IsChecked = ObjectiveProgressService.Instance.IsObjectiveCompletedById(objective.ObjectiveId);
         }
         else
         {

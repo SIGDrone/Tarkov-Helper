@@ -470,12 +470,7 @@ public class MapMarkersManager
 
     private string GetLocalizedName(MapMarker marker)
     {
-        return _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO when !string.IsNullOrEmpty(marker.NameKo) => marker.NameKo,
-            AppLanguage.JA when !string.IsNullOrEmpty(marker.NameJa) => marker.NameJa,
-            _ => marker.Name
-        };
+        return !string.IsNullOrEmpty(marker.NameKo) ? marker.NameKo : marker.Name;
     }
 
     private (string arrow, string floorText, Color color)? GetFloorIndicator(string? markerFloorId)

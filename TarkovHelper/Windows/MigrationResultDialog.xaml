@@ -1,7 +1,7 @@
 <Window x:Class="TarkovHelper.Windows.MigrationResultDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Migration Result"
+        Title="마이그레이션 결과"
         WindowStartupLocation="CenterOwner"
         WindowStyle="None"
         AllowsTransparency="True"
@@ -34,7 +34,7 @@
                 <StackPanel Orientation="Horizontal">
                     <TextBlock x:Name="TxtMigrationResultIcon" Text="" FontSize="{DynamicResource FontSizeHeader}"
                                VerticalAlignment="Center" Margin="0,0,12,0"/>
-                    <TextBlock x:Name="TxtMigrationResultTitle" Text="Migration Complete"
+                    <TextBlock x:Name="TxtMigrationResultTitle" Text="마이그레이션 완료"
                                FontSize="{DynamicResource FontSizeXLarge}" FontWeight="SemiBold"
                                Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
                 </StackPanel>
@@ -59,7 +59,7 @@
 
                     <!-- Quest Progress -->
                     <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,8,8">
-                        <TextBlock x:Name="TxtMigrationQuestLabel" Text="Quest Progress"
+                        <TextBlock x:Name="TxtMigrationQuestLabel" Text="퀘스트 진행도"
                                    FontSize="{DynamicResource FontSizeTiny}"
                                    Foreground="{DynamicResource TextSecondaryBrush}"/>
                         <TextBlock x:Name="TxtMigrationQuestCount" Text="0"
@@ -69,7 +69,7 @@
 
                     <!-- Hideout Progress -->
                     <StackPanel Grid.Row="0" Grid.Column="1" Margin="8,0,0,8">
-                        <TextBlock x:Name="TxtMigrationHideoutLabel" Text="Hideout Progress"
+                        <TextBlock x:Name="TxtMigrationHideoutLabel" Text="은신처 진행도"
                                    FontSize="{DynamicResource FontSizeTiny}"
                                    Foreground="{DynamicResource TextSecondaryBrush}"/>
                         <TextBlock x:Name="TxtMigrationHideoutCount" Text="0"
@@ -79,7 +79,7 @@
 
                     <!-- Item Inventory -->
                     <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,8,8,0">
-                        <TextBlock x:Name="TxtMigrationInventoryLabel" Text="Item Inventory"
+                        <TextBlock x:Name="TxtMigrationInventoryLabel" Text="아이템 인벤토리"
                                    FontSize="{DynamicResource FontSizeTiny}"
                                    Foreground="{DynamicResource TextSecondaryBrush}"/>
                         <TextBlock x:Name="TxtMigrationInventoryCount" Text="0"
@@ -89,7 +89,7 @@
 
                     <!-- Settings -->
                     <StackPanel Grid.Row="1" Grid.Column="1" Margin="8,8,0,0">
-                        <TextBlock x:Name="TxtMigrationSettingsLabel" Text="Settings"
+                        <TextBlock x:Name="TxtMigrationSettingsLabel" Text="설정"
                                    FontSize="{DynamicResource FontSizeTiny}"
                                    Foreground="{DynamicResource TextSecondaryBrush}"/>
                         <TextBlock x:Name="TxtMigrationSettingsCount" Text="0"
@@ -105,7 +105,7 @@
                     CornerRadius="4" Padding="12" Margin="0,0,0,12"
                     Visibility="Collapsed">
                 <StackPanel>
-                    <TextBlock x:Name="TxtMigrationWarningsHeader" Text="Warnings"
+                    <TextBlock x:Name="TxtMigrationWarningsHeader" Text="경고"
                                FontSize="{DynamicResource FontSizeXSmall}" FontWeight="SemiBold"
                                Foreground="#FFA726" Margin="0,0,0,8"/>
                     <ScrollViewer MaxHeight="100" VerticalScrollBarVisibility="Auto">
@@ -126,16 +126,16 @@
 
             <!-- Total Count -->
             <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,0,0,16">
-                <TextBlock x:Name="TxtMigrationTotalLabel" Text="Total imported: "
+                <TextBlock x:Name="TxtMigrationTotalLabel" Text="총 가져온 항목: "
                            FontSize="{DynamicResource FontSizeSmall}"
                            Foreground="{DynamicResource TextSecondaryBrush}"/>
-                <TextBlock x:Name="TxtMigrationTotalCount" Text="0 items"
+                <TextBlock x:Name="TxtMigrationTotalCount" Text="0개"
                            FontSize="{DynamicResource FontSizeSmall}" FontWeight="Bold"
                            Foreground="{DynamicResource AccentBrush}"/>
             </StackPanel>
 
             <!-- OK Button -->
-            <Button Grid.Row="4" x:Name="BtnOk" Content="OK"
+            <Button Grid.Row="4" x:Name="BtnOk" Content="확인"
                     Padding="24,8" HorizontalAlignment="Center"
                     Click="BtnOk_Click"
                     Background="{DynamicResource AccentBrush}"

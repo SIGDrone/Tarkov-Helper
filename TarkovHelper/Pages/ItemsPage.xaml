@@ -80,7 +80,7 @@
                     <!-- Owned Quantity Display -->
                     <StackPanel Grid.Column="2" Grid.Row="0" Orientation="Horizontal"
                                 VerticalAlignment="Center" HorizontalAlignment="Center">
-                        <TextBlock Text="Owned: " FontSize="{DynamicResource FontSizeTiny}"
+                        <TextBlock Text="보유: " FontSize="{DynamicResource FontSizeTiny}"
                                    Foreground="{StaticResource TextSecondaryBrush}"
                                    VerticalAlignment="Center"/>
                         <TextBlock Text="{Binding OwnedDisplay}" FontSize="{DynamicResource FontSizeXSmall}" FontWeight="SemiBold"
@@ -114,7 +114,7 @@
 
                     <!-- Quest Count -->
                     <StackPanel Grid.Column="3" Grid.RowSpan="2" VerticalAlignment="Center" HorizontalAlignment="Center">
-                        <TextBlock Text="Quest" FontSize="{DynamicResource FontSizeTiny}"
+                        <TextBlock Text="퀘스트" FontSize="{DynamicResource FontSizeTiny}"
                                    Foreground="{StaticResource TextSecondaryBrush}"
                                    HorizontalAlignment="Center"/>
                         <TextBlock Text="{Binding QuestDisplay}" FontSize="{DynamicResource FontSizeSmall}"
@@ -124,7 +124,7 @@
 
                     <!-- Hideout Count -->
                     <StackPanel Grid.Column="4" Grid.RowSpan="2" VerticalAlignment="Center" HorizontalAlignment="Center">
-                        <TextBlock Text="Hideout" FontSize="{DynamicResource FontSizeTiny}"
+                        <TextBlock Text="은신처" FontSize="{DynamicResource FontSizeTiny}"
                                    Foreground="{StaticResource TextSecondaryBrush}"
                                    HorizontalAlignment="Center"/>
                         <TextBlock Text="{Binding HideoutDisplay}" FontSize="{DynamicResource FontSizeSmall}"
@@ -134,7 +134,7 @@
 
                     <!-- Total Count -->
                     <StackPanel Grid.Column="5" Grid.RowSpan="2" VerticalAlignment="Center" HorizontalAlignment="Center">
-                        <TextBlock Text="Need" FontSize="{DynamicResource FontSizeTiny}"
+                        <TextBlock Text="필요" FontSize="{DynamicResource FontSizeTiny}"
                                    Foreground="{StaticResource TextSecondaryBrush}"
                                    HorizontalAlignment="Center"/>
                         <TextBlock Text="{Binding TotalDisplay}" FontSize="{DynamicResource FontSizeSmall}"
@@ -203,7 +203,7 @@
                          Margin="0,0,0,8">
                     <TextBox.Style>
                         <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
-                            <Setter Property="Tag" Value="Search items..."/>
+                            <Setter Property="Tag" Value="아이템 검색..."/>
                         </Style>
                     </TextBox.Style>
                 </TextBox>
@@ -213,35 +213,35 @@
                     <!-- Source Filter -->
                     <ComboBox x:Name="CmbSource" MinWidth="70" Margin="0,0,8,4"
                               SelectionChanged="CmbSource_SelectionChanged">
-                        <ComboBoxItem Content="All" Tag="All" IsSelected="True"/>
-                        <ComboBoxItem Content="Quest" Tag="Quest"/>
-                        <ComboBoxItem Content="Hideout" Tag="Hideout"/>
+                        <ComboBoxItem Content="전체" Tag="All" IsSelected="True"/>
+                        <ComboBoxItem Content="퀘스트" Tag="Quest"/>
+                        <ComboBoxItem Content="은신처" Tag="Hideout"/>
                     </ComboBox>
 
                     <!-- Category Filter -->
                     <ComboBox x:Name="CmbCategory" MinWidth="120" MaxWidth="220" Margin="0,0,8,4"
                               SelectionChanged="CmbCategory_SelectionChanged">
-                        <ComboBoxItem Content="All Categories" Tag="All" IsSelected="True"/>
+                        <ComboBoxItem Content="모든 카테고리" Tag="All" IsSelected="True"/>
                     </ComboBox>
 
                     <!-- Fulfillment Filter -->
                     <ComboBox x:Name="CmbFulfillment" MinWidth="90" Margin="0,0,8,4"
                               SelectionChanged="CmbFulfillment_SelectionChanged">
-                        <ComboBoxItem Content="All Status" Tag="All" IsSelected="True"/>
-                        <ComboBoxItem Content="Not Started" Tag="NotStarted"/>
-                        <ComboBoxItem Content="In Progress" Tag="InProgress"/>
-                        <ComboBoxItem Content="Fulfilled" Tag="Fulfilled"/>
+                        <ComboBoxItem Content="모든 상태" Tag="All" IsSelected="True"/>
+                        <ComboBoxItem Content="시작 안 함" Tag="NotStarted"/>
+                        <ComboBoxItem Content="진행 중" Tag="InProgress"/>
+                        <ComboBoxItem Content="수집 완료" Tag="Fulfilled"/>
                     </ComboBox>
 
                     <!-- FIR Filter -->
-                    <CheckBox x:Name="ChkFirOnly" Content="FIR Only"
+                    <CheckBox x:Name="ChkFirOnly" Content="FIR 전용"
                               Foreground="{StaticResource TextPrimaryBrush}"
                               VerticalContentAlignment="Center"
                               Margin="0,0,8,4" Cursor="Hand"
                               Checked="Filter_Changed" Unchecked="Filter_Changed"/>
 
                     <!-- Hide Fulfilled -->
-                    <CheckBox x:Name="ChkHideFulfilled" Content="Hide Fulfilled"
+                    <CheckBox x:Name="ChkHideFulfilled" Content="완료된 항목 숨기기"
                               Foreground="{StaticResource TextPrimaryBrush}"
                               VerticalContentAlignment="Center"
                               Margin="0,0,8,4" Cursor="Hand"
@@ -250,11 +250,11 @@
                     <!-- Sort By -->
                     <ComboBox x:Name="CmbSort" MinWidth="100" Margin="0,0,0,4"
                               SelectionChanged="CmbSort_SelectionChanged">
-                        <ComboBoxItem Content="Name" Tag="Name" IsSelected="True"/>
-                        <ComboBoxItem Content="Total Count" Tag="Total"/>
-                        <ComboBoxItem Content="Quest Count" Tag="Quest"/>
-                        <ComboBoxItem Content="Hideout" Tag="Hideout"/>
-                        <ComboBoxItem Content="Progress" Tag="Progress"/>
+                        <ComboBoxItem Content="이름" Tag="Name" IsSelected="True"/>
+                        <ComboBoxItem Content="전체 개수" Tag="Total"/>
+                        <ComboBoxItem Content="퀘스트 개수" Tag="Quest"/>
+                        <ComboBoxItem Content="은신처 개수" Tag="Hideout"/>
+                        <ComboBoxItem Content="진행도" Tag="Progress"/>
                     </ComboBox>
                 </WrapPanel>
             </Grid>
@@ -298,13 +298,13 @@
 
                         <TextBlock Grid.Column="0" Text="" FontSize="{DynamicResource FontSizeTiny}" FontWeight="SemiBold"
                                    Foreground="{StaticResource TextSecondaryBrush}"/>
-                        <TextBlock x:Name="HeaderItemName" Grid.Column="1" Text="Item Name" FontSize="{DynamicResource FontSizeTiny}" FontWeight="SemiBold"
+                        <TextBlock x:Name="HeaderItemName" Grid.Column="1" Text="아이템 이름" FontSize="{DynamicResource FontSizeTiny}" FontWeight="SemiBold"
                                    Foreground="{StaticResource TextSecondaryBrush}" Margin="12,0,0,0"/>
-                        <TextBlock x:Name="HeaderQuest" Grid.Column="3" Text="Quest" FontSize="{DynamicResource FontSizeTiny}" FontWeight="SemiBold"
+                        <TextBlock x:Name="HeaderQuest" Grid.Column="3" Text="퀘스트" FontSize="{DynamicResource FontSizeTiny}" FontWeight="SemiBold"
                                    Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
-                        <TextBlock x:Name="HeaderHideout" Grid.Column="4" Text="Hideout" FontSize="{DynamicResource FontSizeTiny}" FontWeight="SemiBold"
+                        <TextBlock x:Name="HeaderHideout" Grid.Column="4" Text="은신처" FontSize="{DynamicResource FontSizeTiny}" FontWeight="SemiBold"
                                    Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
-                        <TextBlock x:Name="HeaderTotal" Grid.Column="5" Text="Total" FontSize="{DynamicResource FontSizeTiny}" FontWeight="SemiBold"
+                        <TextBlock x:Name="HeaderTotal" Grid.Column="5" Text="합계" FontSize="{DynamicResource FontSizeTiny}" FontWeight="SemiBold"
                                    Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center"/>
                     </Grid>
                 </Border>
@@ -374,7 +374,7 @@
                         </Grid>
 
                         <!-- Wiki Button (Fixed) -->
-                        <Button x:Name="BtnWiki" Grid.Row="1" Content="Open Wiki" Padding="12,6"
+                        <Button x:Name="BtnWiki" Grid.Row="1" Content="위키 열기" Padding="12,6"
                                 Margin="0,0,0,16" HorizontalAlignment="Left"
                                 Click="BtnWiki_Click"/>
 
@@ -392,25 +392,23 @@
                                     </Grid.ColumnDefinitions>
 
                                     <StackPanel Grid.Column="0" HorizontalAlignment="Center">
-                                        <TextBlock Text="Quest" FontSize="{DynamicResource FontSizeTiny}"
+                                        <TextBlock Text="퀘스트" FontSize="{DynamicResource FontSizeTiny}"
                                                    Foreground="{StaticResource TextSecondaryBrush}"
                                                    HorizontalAlignment="Center"/>
                                         <TextBlock x:Name="TxtDetailQuestCount" FontSize="{DynamicResource FontSizeLarge}" FontWeight="Bold"
                                                    Foreground="{StaticResource TextPrimaryBrush}"
                                                    HorizontalAlignment="Center"/>
                                     </StackPanel>
-
                                     <StackPanel Grid.Column="1" HorizontalAlignment="Center">
-                                        <TextBlock Text="Hideout" FontSize="{DynamicResource FontSizeTiny}"
+                                        <TextBlock Text="은신처" FontSize="{DynamicResource FontSizeTiny}"
                                                    Foreground="{StaticResource TextSecondaryBrush}"
                                                    HorizontalAlignment="Center"/>
                                         <TextBlock x:Name="TxtDetailHideoutCount" FontSize="{DynamicResource FontSizeLarge}" FontWeight="Bold"
                                                    Foreground="{StaticResource TextPrimaryBrush}"
                                                    HorizontalAlignment="Center"/>
                                     </StackPanel>
-
                                     <StackPanel Grid.Column="2" HorizontalAlignment="Center">
-                                        <TextBlock Text="Need" FontSize="{DynamicResource FontSizeTiny}"
+                                        <TextBlock Text="필요" FontSize="{DynamicResource FontSizeTiny}"
                                                    Foreground="{StaticResource TextSecondaryBrush}"
                                                    HorizontalAlignment="Center"/>
                                         <TextBlock x:Name="TxtDetailTotalCount" FontSize="{DynamicResource FontSizeLarge}" FontWeight="Bold"
@@ -421,7 +419,7 @@
                             </Border>
 
                             <!-- Inventory Input Section -->
-                            <TextBlock x:Name="LblYourInventory" Text="Your Inventory" FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
+                            <TextBlock x:Name="LblYourInventory" Text="내 인벤토리" FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
                                        Foreground="{StaticResource TextPrimaryBrush}"
                                        Margin="0,0,0,8"/>
                             <Border Background="{StaticResource BackgroundDarkBrush}"
@@ -439,7 +437,7 @@
                                                     Background="{StaticResource WarningBrush}">
                                                 <TextBlock Text="FIR" FontSize="{DynamicResource FontSizeTiny}" Foreground="White"/>
                                             </Border>
-                                            <TextBlock Text="Qty:" FontSize="{DynamicResource FontSizeXSmall}"
+                                            <TextBlock Text="수량:" FontSize="{DynamicResource FontSizeXSmall}"
                                                        Foreground="{StaticResource TextSecondaryBrush}"
                                                        VerticalAlignment="Center"/>
                                         </StackPanel>
@@ -479,7 +477,7 @@
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
 
-                                        <TextBlock Grid.Column="0" Text="Non-FIR:" FontSize="{DynamicResource FontSizeXSmall}"
+                                        <TextBlock Grid.Column="0" Text="일반(Non-FIR):" FontSize="{DynamicResource FontSizeXSmall}"
                                                    Foreground="{StaticResource TextSecondaryBrush}"
                                                    VerticalAlignment="Center"/>
 
@@ -521,7 +519,7 @@
                                             </Grid.ColumnDefinitions>
 
                                             <StackPanel Grid.Column="0">
-                                                <TextBlock x:Name="LblProgress" Text="Progress" FontSize="{DynamicResource FontSizeTiny}"
+                                                <TextBlock x:Name="LblProgress" Text="진행도" FontSize="{DynamicResource FontSizeTiny}"
                                                            Foreground="{StaticResource TextSecondaryBrush}"/>
                                                 <ProgressBar x:Name="DetailProgressBar"
                                                              Height="6" Margin="0,4,8,0"
@@ -545,7 +543,7 @@
 
                             <!-- Quest Requirements Section -->
                             <StackPanel x:Name="QuestSection">
-                                <TextBlock x:Name="LblRequiredForQuests" Text="Required for Quests" FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
+                                <TextBlock x:Name="LblRequiredForQuests" Text="퀘스트 요구 사항" FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
                                            Foreground="{StaticResource TextPrimaryBrush}"
                                            Margin="0,0,0,8"/>
                                 <Border Background="{StaticResource BackgroundDarkBrush}"
@@ -620,7 +618,7 @@
 
                             <!-- Hideout Requirements Section -->
                             <StackPanel x:Name="HideoutSection">
-                                <TextBlock x:Name="LblRequiredForHideout" Text="Required for Hideout" FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
+                                <TextBlock x:Name="LblRequiredForHideout" Text="은신처 요구 사항" FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
                                            Foreground="{StaticResource TextPrimaryBrush}"
                                            Margin="0,0,0,8"/>
                                 <Border Background="{StaticResource BackgroundDarkBrush}"

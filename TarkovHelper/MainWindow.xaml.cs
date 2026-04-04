@@ -72,31 +72,9 @@ public partial class MainWindow : Window
         TxtWelcome.Text = _loc.Welcome;
     }
 
-    private void CmbLanguage_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_isLoading) return;
-        if (CmbLanguage.SelectedItem is ComboBoxItem item && item.Tag is string lang)
-        {
-            _loc.CurrentLanguage = lang switch
-            {
-                "KO" => AppLanguage.KO,
-                "JA" => AppLanguage.JA,
-                _ => AppLanguage.EN
-            };
-        }
-    }
-
     private async void Window_Loaded(object sender, RoutedEventArgs e)
     {
         _isLoading = true;
-
-        // Apply saved language setting to UI
-        CmbLanguage.SelectedIndex = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => 1,
-            AppLanguage.JA => 2,
-            _ => 0
-        };
 
         // Initialize player level UI
         UpdatePlayerLevelUI();
@@ -111,15 +89,18 @@ public partial class MainWindow : Window
         UpdateEditionUI();
         UpdatePrestigeLevelUI();
 
+        // Initialize profile toggle state
+        if (ProfileService.Instance.CurrentProfile == ProfileType.Pve)
+            RadioPve.IsChecked = true;
+        else
+            RadioPvp.IsChecked = true;
+
         UpdateAllLocalizedText();
 
         _isLoading = false;
 
         // Start database update check (initial check + background updates every 5 minutes)
         StartDatabaseUpdateService();
-
-        // Start app update service (check every 3 minutes)
-        StartAppUpdateService();
 
         // Load and show quest data from DB
         await CheckAndRefreshDataAsync();
@@ -207,7 +188,7 @@ public partial class MainWindow : Window
     /// <summary>
     /// Show loading overlay with blur effect
     /// </summary>
-    public void ShowLoadingOverlay(string status = "Loading...")
+    public void ShowLoadingOverlay(string status = "로딩 중...")
     {
         LoadingStatusText.Text = status;
         LoadingOverlay.Visibility = Visibility.Visible;
@@ -261,12 +242,7 @@ public partial class MainWindow : Window
         bool needsMigration = migrationService.NeedsAutoMigration();
         if (needsMigration)
         {
-            ShowLoadingOverlay(_loc.CurrentLanguage switch
-            {
-                AppLanguage.KO => "데이터 마이그레이션 중...",
-                AppLanguage.JA => "データ移行中...",
-                _ => "Migrating data..."
-            });
+            ShowLoadingOverlay("데이터 마이그레이션 중...");
 
             try
             {
@@ -389,7 +365,7 @@ public partial class MainWindow : Window
         }
         else
         {
-            TxtWelcome.Text = "No quest data available. Please refresh data.";
+            TxtWelcome.Text = "퀘스트 데이터가 없습니다. 데이터를 새로고침 해주세요.";
             TxtWelcome.Visibility = Visibility.Visible;
             TabContentArea.Visibility = Visibility.Collapsed;
         }
@@ -404,6 +380,81 @@ public partial class MainWindow : Window
             // 마이그레이션이 필요했지만 결과가 없는 경우 Blur 해제
             var blurAnimation = new DoubleAnimation(8, 0, TimeSpan.FromMilliseconds(200));
             BlurEffect.BeginAnimation(System.Windows.Media.Effects.BlurEffect.RadiusProperty, blurAnimation);
+        }
+    }
+
+    /// <summary>
+    /// 프로필 라디오 버튼 변경 핸들러
+    /// </summary>
+    private async void ProfileRadio_Checked(object sender, RoutedEventArgs e)
+    {
+        if (_isLoading) return;
+
+        var newProfile = sender == RadioPve ? ProfileType.Pve : ProfileType.Pvp;
+        
+        if (ProfileService.Instance.CurrentProfile != newProfile)
+        {
+            ProfileService.Instance.CurrentProfile = newProfile;
+            await RefreshCurrentProfileDataAsync();
+        }
+    }
+
+    /// <summary>
+    /// 현재 프로필 데이터를 기반으로 모든 서비스 및 UI 새로고침
+    /// </summary>
+    private async Task RefreshCurrentProfileDataAsync()
+    {
+        ShowLoadingOverlay($"{ProfileService.Instance.CurrentProfile} 데이터 로드 중...");
+
+        try
+        {
+            // 1. 서비스들 설정 재로딩 (DB에서 현재 프로필 데이터 가져옴)
+            _settingsService.ReloadSettings();
+            await QuestProgressService.Instance.InitializeFromDbAsync();
+            _hideoutProgressService.ReloadProgress();
+            ItemInventoryService.Instance.ReloadInventory();
+            // CustomMapMarkerService 등 다른 서비스가 있다면 추가
+
+            // 2. 메인 UI 요소들 동기화
+            UpdatePlayerLevelUI();
+            UpdateScavRepUI();
+            UpdateDspDecodeUI();
+            UpdateEditionUI();
+            UpdatePrestigeLevelUI();
+
+            // 3. 현재 페이지 데이터 새로고침
+            if (PageContent.Content is QuestListPage questPage)
+            {
+                await questPage.ReloadDataAsync();
+            }
+            else if (PageContent.Content is HideoutPage hideoutPage)
+            {
+                await hideoutPage.ReloadDataAsync();
+            }
+            else if (PageContent.Content is ItemsPage itemsPage)
+            {
+                await itemsPage.ReloadDataAsync();
+            }
+            else if (PageContent.Content is CollectorPage collectorPage)
+            {
+                await collectorPage.ReloadDataAsync();
+            }
+            else if (PageContent.Content is MapPage mapPage)
+            {
+                // MapPage에도 ReloadDataAsync() 또는 유사한 로직이 필요할 수 있음
+                // 일단은 페이지를 새로 생성하여 교체함
+                _mapTrackerPage = new MapPage();
+                PageContent.Content = _mapTrackerPage;
+            }
+        }
+        catch (Exception ex)
+        {
+            _log.Error($"Profile refresh failed: {ex.Message}");
+            MessageBox.Show($"프로필을 불러오는 데 실패했습니다: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            HideLoadingOverlay();
         }
     }
 
@@ -429,7 +480,7 @@ public partial class MainWindow : Window
                 // Hideout data not available, show message or load it
                 PageContent.Content = new TextBlock
                 {
-                    Text = "Hideout data not available. Please refresh data.",
+                    Text = "은신처 데이터가 없습니다. 데이터를 새로고침 해주세요.",
                     Foreground = FindResource("TextSecondaryBrush") as System.Windows.Media.Brush,
                     FontSize = 16,
                     HorizontalAlignment = HorizontalAlignment.Center,
@@ -800,24 +851,6 @@ public partial class MainWindow : Window
 
     #endregion
 
-    /// <summary>
-    /// Open Buy me a coffee page
-    /// </summary>
-    private void BtnCoffee_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = "https://buymeacoffee.com/zeliperstap",
-                UseShellExecute = true
-            });
-        }
-        catch
-        {
-            // Ignore errors opening browser
-        }
-    }
 
     /// <summary>
     /// Reset all progress with confirmation
@@ -825,8 +858,8 @@ public partial class MainWindow : Window
     private async void BtnResetProgress_Click(object sender, RoutedEventArgs e)
     {
         var result = MessageBox.Show(
-            "정말 진행도를 초기화 하시겠습니까?\nAre you sure you want to reset all progress?\n\nThis will reset:\n- Quest progress\n- Hideout progress",
-            "Reset Progress / 진행도 초기화",
+            "정말 진행도를 초기화 하시겠습니까?",
+            "진행도 초기화",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning);
 
@@ -842,8 +875,8 @@ public partial class MainWindow : Window
             await LoadAndShowQuestListAsync();
 
             MessageBox.Show(
-                "진행도가 초기화되었습니다.\nAll progress has been reset.",
-                "Reset Complete / 초기화 완료",
+            "진행도가 초기화되었습니다.",
+            "초기화 완료",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
         }
@@ -860,7 +893,7 @@ public partial class MainWindow : Window
     {
         _isProfileDrawerOpen = !_isProfileDrawerOpen;
         ProfileDrawer.Visibility = _isProfileDrawerOpen ? Visibility.Visible : Visibility.Collapsed;
-        BtnProfile.Content = _isProfileDrawerOpen ? "▲ Profile" : "▼ Profile";
+        BtnProfile.Content = _isProfileDrawerOpen ? "▲ 프로필" : "▼ 프로필";
     }
 
     #endregion
@@ -929,12 +962,7 @@ public partial class MainWindow : Window
         }
         else
         {
-            TxtCurrentLogPath.Text = _loc.CurrentLanguage switch
-            {
-                AppLanguage.KO => "설정되지 않음",
-                AppLanguage.JA => "未設定",
-                _ => "Not configured"
-            };
+            TxtCurrentLogPath.Text = "설정되지 않음";
             TxtCurrentLogPath.Foreground = (Brush)FindResource("TextSecondaryBrush");
         }
 
@@ -955,19 +983,13 @@ public partial class MainWindow : Window
             TxtLogFolderStatus.Text = _loc.CurrentLanguage switch
             {
                 AppLanguage.KO => "유효한 경로",
-                AppLanguage.JA => "有効なパス",
-                _ => "Valid path"
+                _ => "유효한 경로"
             };
         }
         else
         {
             LogFolderStatusIndicator.Fill = new SolidColorBrush(Color.FromRgb(244, 67, 54)); // Red
-            TxtLogFolderStatus.Text = _loc.CurrentLanguage switch
-            {
-                AppLanguage.KO => "유효하지 않은 경로",
-                AppLanguage.JA => "無効なパス",
-                _ => "Invalid path"
-            };
+            TxtLogFolderStatus.Text = "잘못된 경로";
         }
     }
 
@@ -976,47 +998,18 @@ public partial class MainWindow : Window
     /// </summary>
     private void UpdateSettingsLocalizedText()
     {
-        TxtSettingsTitle.Text = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => "설정",
-            AppLanguage.JA => "設定",
-            _ => "Settings"
-        };
 
-        TxtLogFolderLabel.Text = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => "Tarkov 로그 폴더",
-            AppLanguage.JA => "Tarkovログフォルダ",
-            _ => "Tarkov Log Folder"
-        };
+        TxtSettingsTitle.Text = "설정";
 
-        TxtLogFolderDesc.Text = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => "자동 퀘스트 완료 추적을 위해 Tarkov의 Logs 폴더 경로를 설정하세요.",
-            AppLanguage.JA => "自動クエスト完了追跡のために、TarkovのLogsフォルダのパスを設定してください。",
-            _ => "Set the path to Tarkov's Logs folder for automatic quest completion tracking."
-        };
+        TxtLogFolderLabel.Text = "Tarkov 로그 폴더";
 
-        BtnAutoDetect.Content = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => "자동 감지",
-            AppLanguage.JA => "自動検出",
-            _ => "Auto Detect"
-        };
+        TxtLogFolderDesc.Text = "자동 퀘스트 완료 추적을 위해 Tarkov의 Logs 폴더 경로를 설정하세요.";
 
-        BtnBrowseLogFolder.Content = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => "찾아보기...",
-            AppLanguage.JA => "参照...",
-            _ => "Browse..."
-        };
+        BtnAutoDetect.Content = "자동 감지";
 
-        BtnResetLogFolder.Content = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => "초기화",
-            AppLanguage.JA => "リセット",
-            _ => "Reset"
-        };
+        BtnBrowseLogFolder.Content = "찾아보기...";
+
+        BtnResetLogFolder.Content = "초기화";
     }
 
     /// <summary>
@@ -1051,15 +1044,9 @@ public partial class MainWindow : Window
             _settingsService.LogFolderPath = detectedPath;
             UpdateSettingsUI();
 
-            var message = _loc.CurrentLanguage switch
-            {
-                AppLanguage.KO => $"로그 폴더를 찾았습니다:\n{detectedPath}",
-                AppLanguage.JA => $"ログフォルダが見つかりました:\n{detectedPath}",
-                _ => $"Log folder detected:\n{detectedPath}"
-            };
+            var message = $"로그 폴더를 찾았습니다:\n{detectedPath}";
 
-            MessageBox.Show(message,
-                _loc.CurrentLanguage switch { AppLanguage.KO => "자동 감지", AppLanguage.JA => "自動検出", _ => "Auto Detect" },
+            MessageBox.Show(message, "자동 감지",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
         }
@@ -1067,15 +1054,9 @@ public partial class MainWindow : Window
         {
             UpdateSettingsUI();
 
-            var message = _loc.CurrentLanguage switch
-            {
-                AppLanguage.KO => "Tarkov 설치를 찾을 수 없습니다.\n수동으로 로그 폴더를 선택해주세요.",
-                AppLanguage.JA => "Tarkovのインストールが見つかりませんでした。\n手動でログフォルダを選択してください。",
-                _ => "Could not detect Tarkov installation.\nPlease select the log folder manually."
-            };
+            var message = "Tarkov 설치를 찾을 수 없습니다.\n수동으로 로그 폴더를 선택해 주세요.";
 
-            MessageBox.Show(message,
-                _loc.CurrentLanguage switch { AppLanguage.KO => "자동 감지 실패", AppLanguage.JA => "自動検出失敗", _ => "Auto Detect Failed" },
+            MessageBox.Show(message, "경고",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
@@ -1088,12 +1069,7 @@ public partial class MainWindow : Window
     {
         var dialog = new Microsoft.Win32.OpenFolderDialog
         {
-            Title = _loc.CurrentLanguage switch
-            {
-                AppLanguage.KO => "Tarkov Logs 폴더 선택",
-                AppLanguage.JA => "Tarkov Logsフォルダを選択",
-                _ => "Select Tarkov Logs Folder"
-            }
+            Title = "Tarkov Logs 폴더 선택"
         };
 
         if (dialog.ShowDialog() == true)
@@ -1171,26 +1147,9 @@ public partial class MainWindow : Window
     private void UpdateQuestSyncUI()
     {
         // Update localized text
-        TxtQuestSyncLabel.Text = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => "퀘스트 로그 동기화",
-            AppLanguage.JA => "クエストログ同期",
-            _ => "Quest Log Sync"
-        };
-
-        TxtQuestSyncDesc.Text = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => "게임 로그 파일에서 퀘스트 진행 상태를 동기화합니다. Tarkov 로그를 분석하여 완료된 퀘스트를 업데이트합니다.",
-            AppLanguage.JA => "ゲームログファイルからクエストの進行状況を同期します。Tarkovログを分析して完了したクエストを更新します。",
-            _ => "Synchronize quest progress from game log files. This will analyze your Tarkov logs and update completed quests."
-        };
-
-        BtnSyncQuest.Content = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => "퀘스트 동기화",
-            AppLanguage.JA => "クエスト同期",
-            _ => "Sync Quest"
-        };
+        TxtQuestSyncLabel.Text = "퀘스트 로그 동기화";
+        TxtQuestSyncDesc.Text = "게임 로그 파일에서 퀘스트 진행 상태를 동기화합니다. Tarkov 로그를 분석하여 완료된 퀘스트를 업데이트합니다.";
+        BtnSyncQuest.Content = "퀘스트 동기화";
 
         // Update monitoring status
         var isMonitoring = _logSyncService.IsMonitoring;
@@ -1198,33 +1157,9 @@ public partial class MainWindow : Window
             ? new SolidColorBrush(Color.FromRgb(76, 175, 80)) // Green
             : new SolidColorBrush(Color.FromRgb(244, 67, 54)); // Red
 
-        TxtMonitoringStatus.Text = isMonitoring
-            ? _loc.CurrentLanguage switch
-            {
-                AppLanguage.KO => "모니터링 중",
-                AppLanguage.JA => "監視中",
-                _ => "Monitoring"
-            }
-            : _loc.CurrentLanguage switch
-            {
-                AppLanguage.KO => "모니터링 안함",
-                AppLanguage.JA => "監視していない",
-                _ => "Not monitoring"
-            };
+        TxtMonitoringStatus.Text = isMonitoring ? "모니터링 중" : "모니터링 안함";
 
-        BtnToggleMonitoring.Content = isMonitoring
-            ? _loc.CurrentLanguage switch
-            {
-                AppLanguage.KO => "모니터링 중지",
-                AppLanguage.JA => "監視停止",
-                _ => "Stop Monitoring"
-            }
-            : _loc.CurrentLanguage switch
-            {
-                AppLanguage.KO => "모니터링 시작",
-                AppLanguage.JA => "監視開始",
-                _ => "Start Monitoring"
-            };
+        BtnToggleMonitoring.Content = isMonitoring ? "모니터링 중지" : "모니터링 시작";
 
         // Disable sync button if log folder is not valid
         BtnSyncQuest.IsEnabled = _settingsService.IsLogFolderValid;
@@ -1240,13 +1175,8 @@ public partial class MainWindow : Window
         if (string.IsNullOrEmpty(logPath) || !Directory.Exists(logPath))
         {
             MessageBox.Show(
-                _loc.CurrentLanguage switch
-                {
-                    AppLanguage.KO => "로그 폴더가 설정되지 않았거나 존재하지 않습니다.",
-                    AppLanguage.JA => "ログフォルダが設定されていないか、存在しません。",
-                    _ => "Log folder is not configured or does not exist."
-                },
-                _loc.CurrentLanguage switch { AppLanguage.KO => "오류", AppLanguage.JA => "エラー", _ => "Error" },
+                "로그 폴더가 설정되지 않았거나 존재하지 않습니다.",
+                "오류",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
             return;
@@ -1273,12 +1203,7 @@ public partial class MainWindow : Window
     /// </summary>
     private async void PerformQuestSync(string logPath)
     {
-        ShowLoadingOverlay(_loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => "로그 파일 스캔 중...",
-            AppLanguage.JA => "ログファイルをスキャン中...",
-            _ => "Scanning log files..."
-        });
+        ShowLoadingOverlay("로그 파일 스캔 중...");
 
         try
         {
@@ -1298,19 +1223,10 @@ public partial class MainWindow : Window
             if (result.QuestsToComplete.Count == 0 && result.InProgressQuests.Count == 0)
             {
                 MessageBox.Show(
-                    _loc.CurrentLanguage switch
-                    {
-                        AppLanguage.KO => result.TotalEventsFound > 0
-                            ? $"퀘스트 이벤트 {result.TotalEventsFound}개를 찾았지만, 업데이트할 퀘스트가 없습니다."
-                            : "로그에서 퀘스트 이벤트를 찾지 못했습니다.",
-                        AppLanguage.JA => result.TotalEventsFound > 0
-                            ? $"{result.TotalEventsFound}件のクエストイベントが見つかりましたが、更新するクエストはありません。"
-                            : "ログにクエストイベントが見つかりませんでした。",
-                        _ => result.TotalEventsFound > 0
-                            ? $"Found {result.TotalEventsFound} quest events, but no quests need to be updated."
-                            : "No quest events found in logs."
-                    },
-                    _loc.CurrentLanguage switch { AppLanguage.KO => "동기화 완료", AppLanguage.JA => "同期完了", _ => "Sync Complete" },
+                    result.TotalEventsFound > 0
+                        ? $"퀘스트 이벤트 {result.TotalEventsFound}개를 찾았지만, 업데이트할 퀘스트가 없습니다."
+                        : "로그에서 퀘스트 이벤트를 찾지 못했습니다.",
+                    "동기화 완료",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 return;
@@ -1323,8 +1239,8 @@ public partial class MainWindow : Window
         {
             HideLoadingOverlay();
             MessageBox.Show(
-                $"Error: {ex.Message}",
-                "Sync Error",
+                $"오류 발생: {ex.Message}",
+                "동기화 오류",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
         }
@@ -1370,24 +1286,9 @@ public partial class MainWindow : Window
             {
                 var message = evt.EventType switch
                 {
-                    QuestEventType.Started => _loc.CurrentLanguage switch
-                    {
-                        AppLanguage.KO => $"퀘스트 시작: {task.Name}",
-                        AppLanguage.JA => $"クエスト開始: {task.Name}",
-                        _ => $"Quest Started: {task.Name}"
-                    },
-                    QuestEventType.Completed => _loc.CurrentLanguage switch
-                    {
-                        AppLanguage.KO => $"퀘스트 완료: {task.Name}",
-                        AppLanguage.JA => $"クエスト完了: {task.Name}",
-                        _ => $"Quest Completed: {task.Name}"
-                    },
-                    QuestEventType.Failed => _loc.CurrentLanguage switch
-                    {
-                        AppLanguage.KO => $"퀘스트 실패: {task.Name}",
-                        AppLanguage.JA => $"クエスト失敗: {task.Name}",
-                        _ => $"Quest Failed: {task.Name}"
-                    },
+                    QuestEventType.Started => $"퀘스트 시작: {task.Name}",
+                    QuestEventType.Completed => $"퀘스트 완료: {task.Name}",
+                    QuestEventType.Failed => $"퀘스트 실패: {task.Name}",
                     _ => ""
                 };
 
@@ -1459,12 +1360,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        ShowLoadingOverlay(_loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => "퀘스트 진행도 업데이트 중...",
-            AppLanguage.JA => "クエスト進捗を更新中...",
-            _ => "Updating quest progress..."
-        });
+        ShowLoadingOverlay("퀘스트 진행도 업데이트 중...");
 
         await _logSyncService.ApplyQuestChangesAsync(selectedChanges);
 
@@ -1476,19 +1372,10 @@ public partial class MainWindow : Window
         var totalUpdated = selectedChanges.Count;
 
         MessageBox.Show(
-            _loc.CurrentLanguage switch
-            {
-                AppLanguage.KO => alternativeCount > 0
-                    ? $"{totalUpdated}개의 퀘스트가 업데이트되었습니다.\n(선택 퀘스트 {alternativeCount}개 그룹 포함)"
-                    : $"{totalUpdated}개의 퀘스트가 업데이트되었습니다.",
-                AppLanguage.JA => alternativeCount > 0
-                    ? $"{totalUpdated}件のクエストが更新されました。\n(選択クエスト {alternativeCount}グループ含む)"
-                    : $"{totalUpdated}件のクエストが更新されました。",
-                _ => alternativeCount > 0
-                    ? $"{totalUpdated} quests have been updated.\n(Including {alternativeCount} optional quest groups)"
-                    : $"{totalUpdated} quests have been updated."
-            },
-            _loc.CurrentLanguage switch { AppLanguage.KO => "동기화 완료", AppLanguage.JA => "同期完了", _ => "Sync Complete" },
+            alternativeCount > 0
+                ? $"{totalUpdated}개의 퀘스트가 업데이트되었습니다.\n(선택 퀘스트 {alternativeCount}개 그룹 포함)"
+                : $"{totalUpdated}개의 퀘스트가 업데이트되었습니다.",
+            "동기화 완료",
             MessageBoxButton.OK,
             MessageBoxImage.Information);
     }
@@ -1536,7 +1423,7 @@ public partial class MainWindow : Window
         // Show success message
         MessageBox.Show(
             string.Format(_loc.QuestsAppliedSuccess, result.SelectedQuests.Count, completedCount),
-            _loc.CurrentLanguage switch { AppLanguage.KO => "Applied", AppLanguage.JA => "Applied", _ => "Applied" },
+            "알림",
             MessageBoxButton.OK,
             MessageBoxImage.Information);
     }
@@ -1633,13 +1520,8 @@ public partial class MainWindow : Window
     private void BtnClearCache_Click(object sender, RoutedEventArgs e)
     {
         var result = MessageBox.Show(
-            _loc.CurrentLanguage switch
-            {
-                AppLanguage.KO => "캐시를 삭제하시겠습니까?\n(Wiki 페이지, 이미지 등이 삭제됩니다)",
-                AppLanguage.JA => "キャッシュを削除しますか？\n（Wikiページ、画像などが削除されます）",
-                _ => "Clear cache?\n(Wiki pages, images, etc. will be deleted)"
-            },
-            _loc.CurrentLanguage switch { AppLanguage.KO => "캐시 삭제", AppLanguage.JA => "キャッシュ削除", _ => "Clear Cache" },
+            "캐시를 삭제하시겠습니까?\n(Wiki 페이지, 이미지 등이 삭제됩니다)",
+            "캐시 삭제",
             MessageBoxButton.YesNo,
             MessageBoxImage.Question);
 
@@ -1659,21 +1541,16 @@ public partial class MainWindow : Window
             UpdateCacheSizeDisplay();
 
             MessageBox.Show(
-                _loc.CurrentLanguage switch
-                {
-                    AppLanguage.KO => "캐시가 삭제되었습니다.\n데이터를 다시 가져오려면 Refresh 버튼을 누르세요.",
-                    AppLanguage.JA => "キャッシュが削除されました。\nデータを再取得するにはRefreshボタンを押してください。",
-                    _ => "Cache cleared.\nPress Refresh to re-download data."
-                },
-                _loc.CurrentLanguage switch { AppLanguage.KO => "완료", AppLanguage.JA => "完了", _ => "Done" },
+                "캐시가 삭제되었습니다.\n데이터를 다시 가져오려면 '새로고침' 버튼을 누르세요.",
+                "삭제 완료",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
             MessageBox.Show(
-                $"Error clearing cache: {ex.Message}",
-                "Error",
+                $"캐시 삭제 중 오류 발생: {ex.Message}",
+                "오류",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
         }
@@ -1690,13 +1567,8 @@ public partial class MainWindow : Window
     private async void BtnClearAllData_Click(object sender, RoutedEventArgs e)
     {
         var result = MessageBox.Show(
-            _loc.CurrentLanguage switch
-            {
-                AppLanguage.KO => "모든 데이터를 삭제하시겠습니까?\n(캐시, 퀘스트 데이터, 아이템 데이터 등이 삭제됩니다)\n\n⚠️ 퀘스트 진행 상태는 유지됩니다.",
-                AppLanguage.JA => "すべてのデータを削除しますか？\n（キャッシュ、クエストデータ、アイテムデータなどが削除されます）\n\n⚠️ クエスト進行状況は保持されます。",
-                _ => "Clear all data?\n(Cache, quest data, item data, etc. will be deleted)\n\n⚠️ Quest progress will be preserved."
-            },
-            _loc.CurrentLanguage switch { AppLanguage.KO => "데이터 초기화", AppLanguage.JA => "データ初期化", _ => "Clear All Data" },
+            "모든 데이터를 삭제하시겠습니까?\n(캐시, 퀘스트 데이터, 아이템 데이터 등이 삭제됩니다)\n\n⚠️ 퀘스트 진행 상태는 유지됩니다.",
+            "데이터 초기화",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning);
 
@@ -1728,21 +1600,16 @@ public partial class MainWindow : Window
 
             // Show confirmation
             MessageBox.Show(
-                _loc.CurrentLanguage switch
-                {
-                    AppLanguage.KO => "캐시가 삭제되었습니다.",
-                    AppLanguage.JA => "キャッシュが削除されました。",
-                    _ => "Cache cleared."
-                },
-                _loc.CurrentLanguage switch { AppLanguage.KO => "완료", AppLanguage.JA => "完了", _ => "Done" },
+                "캐시가 삭제되었습니다.",
+                "완료",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
             MessageBox.Show(
-                $"Error clearing data: {ex.Message}",
-                "Error",
+                $"데이터 삭제 중 오류 발생: {ex.Message}",
+                "오류",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
         }
@@ -1750,6 +1617,62 @@ public partial class MainWindow : Window
         {
             BtnClearCache.IsEnabled = true;
             BtnClearAllData.IsEnabled = true;
+        }
+    }
+
+    /// <summary>
+    /// Manual API data update button click handler
+    /// </summary>
+    private async void BtnUpdateApiData_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            BtnUpdateApiData.IsEnabled = false;
+            TxtApiUpdateStatus.Text = _loc.ApiUpdateCheck;
+            TxtApiUpdateStatus.Foreground = (Brush)FindResource("TextSecondaryBrush");
+
+            var result = await DatabaseUpdateService.Instance.CheckAndUpdateAsync();
+
+            if (result.Success)
+            {
+                if (result.WasUpdated)
+                {
+                    TxtApiUpdateStatus.Text = _loc.ApiUpdateSuccess;
+                    TxtApiUpdateStatus.Foreground = (Brush)FindResource("SuccessBrush");
+
+                    // Refresh current page to show new data
+                    if (_questListPage != null && _questListPage.IsVisible)
+                    {
+                        await LoadAndShowQuestListAsync();
+                    }
+                    else if (_itemsPage != null && _itemsPage.IsVisible)
+                    {
+                        // ItemsPage doesn't have a public refresh, but reload should work
+                        _itemsPage = new Pages.ItemsPage();
+                        PageContent.Content = _itemsPage;
+                    }
+                }
+                else
+                {
+                    TxtApiUpdateStatus.Text = _loc.ApiUpToDate;
+                    TxtApiUpdateStatus.Foreground = (Brush)FindResource("TextSecondaryBrush");
+                }
+            }
+            else
+            {
+                TxtApiUpdateStatus.Text = string.Format(_loc.ApiUpdateFail, result.Message);
+                TxtApiUpdateStatus.Foreground = (Brush)FindResource("ErrorBrush");
+            }
+        }
+        catch (Exception ex)
+        {
+            _log.Error($"Manual API update failed: {ex.Message}");
+            TxtApiUpdateStatus.Text = string.Format(_loc.ApiUpdateFail, ex.Message);
+            TxtApiUpdateStatus.Foreground = (Brush)FindResource("ErrorBrush");
+        }
+        finally
+        {
+            BtnUpdateApiData.IsEnabled = true;
         }
     }
 
@@ -1830,12 +1753,7 @@ public partial class MainWindow : Window
     {
         var dialog = new Microsoft.Win32.OpenFolderDialog
         {
-            Title = _loc.CurrentLanguage switch
-            {
-                AppLanguage.KO => "이전 버전 Config 폴더 선택",
-                AppLanguage.JA => "以前のバージョンのConfigフォルダを選択",
-                _ => "Select Previous Version Config Folder"
-            }
+            Title = "이전 버전 Config 폴더 선택"
         };
 
         if (dialog.ShowDialog() != true) return;
@@ -1847,13 +1765,8 @@ public partial class MainWindow : Window
         if (!migrationService.IsValidConfigFolder(selectedPath))
         {
             MessageBox.Show(
-                _loc.CurrentLanguage switch
-                {
-                    AppLanguage.KO => "유효한 Config 폴더가 아닙니다.\nquest_progress.json, hideout_progress.json, item_inventory.json 또는 app_settings.json 파일이 필요합니다.",
-                    AppLanguage.JA => "有効なConfigフォルダではありません。\nquest_progress.json、hideout_progress.json、item_inventory.json、またはapp_settings.jsonファイルが必要です。",
-                    _ => "Invalid Config folder.\nMust contain quest_progress.json, hideout_progress.json, item_inventory.json, or app_settings.json."
-                },
-                _loc.CurrentLanguage switch { AppLanguage.KO => "오류", AppLanguage.JA => "エラー", _ => "Error" },
+                "유효한 Config 폴더가 아닙니다.\nquest_progress.json, hideout_progress.json, item_inventory.json 또는 app_settings.json 파일이 필요합니다.",
+                "오류",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
             return;
@@ -1863,31 +1776,16 @@ public partial class MainWindow : Window
         var preview = migrationService.PreviewMigration(selectedPath);
 
         // Show confirmation
-        var confirmMessage = _loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => $"다음 데이터를 가져올 수 있습니다:\n\n" +
+        var confirmMessage = $"다음 데이터를 가져올 수 있습니다:\n\n" +
                               $"- 퀘스트 진행: {preview.QuestProgressCount}개\n" +
                               $"- 하이드아웃 진행: {preview.HideoutProgressCount}개\n" +
                               $"- 아이템 인벤토리: {preview.ItemInventoryCount}개\n" +
                               $"- 설정: {preview.SettingsCount}개\n\n" +
-                              "가져오기를 진행하시겠습니까?\n(기존 데이터를 덮어씁니다)",
-            AppLanguage.JA => $"以下のデータをインポートできます:\n\n" +
-                              $"- クエスト進行: {preview.QuestProgressCount}件\n" +
-                              $"- ハイドアウト進行: {preview.HideoutProgressCount}件\n" +
-                              $"- アイテムインベントリ: {preview.ItemInventoryCount}件\n" +
-                              $"- 設定: {preview.SettingsCount}件\n\n" +
-                              "インポートを続行しますか？\n(既存のデータは上書きされます)",
-            _ => $"The following data can be imported:\n\n" +
-                 $"- Quest Progress: {preview.QuestProgressCount}\n" +
-                 $"- Hideout Progress: {preview.HideoutProgressCount}\n" +
-                 $"- Item Inventory: {preview.ItemInventoryCount}\n" +
-                 $"- Settings: {preview.SettingsCount}\n\n" +
-                 "Do you want to proceed?\n(Existing data will be overwritten)"
-        };
+                              "가져오기를 진행하시겠습니까?\n(기존 데이터를 덮어씁니다)";
 
         var confirmResult = MessageBox.Show(
             confirmMessage,
-            _loc.CurrentLanguage switch { AppLanguage.KO => "데이터 가져오기", AppLanguage.JA => "データのインポート", _ => "Import Data" },
+            "데이터 가져오기",
             MessageBoxButton.YesNo,
             MessageBoxImage.Question);
 
@@ -1897,12 +1795,7 @@ public partial class MainWindow : Window
         HideSettingsOverlay();
 
         // Show loading overlay
-        ShowLoadingOverlay(_loc.CurrentLanguage switch
-        {
-            AppLanguage.KO => "데이터 마이그레이션 중...",
-            AppLanguage.JA => "データ移行中...",
-            _ => "Migrating data..."
-        });
+        ShowLoadingOverlay("데이터 마이그레이션 중...");
 
         try
         {
@@ -1926,8 +1819,8 @@ public partial class MainWindow : Window
         {
             HideLoadingOverlay();
             MessageBox.Show(
-                $"Migration failed: {ex.Message}",
-                "Error",
+                $"데이터 가져오기 실패: {ex.Message}",
+                "오류",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
         }
@@ -1943,166 +1836,4 @@ public partial class MainWindow : Window
 
     #endregion
 
-    #region App Update
-
-    /// <summary>
-    /// Start app update service
-    /// </summary>
-    private void StartAppUpdateService()
-    {
-        var updateService = UpdateService.Instance;
-
-        // Initialize version display
-        TxtCurrentVersion.Text = $"v{updateService.CurrentVersion.ToString(3)}";
-
-        // Subscribe to update events
-        updateService.UpdateCheckStarted += OnUpdateCheckStarted;
-        updateService.UpdateCheckCompleted += OnUpdateCheckCompleted;
-
-        // Start automatic update checking (every 3 minutes)
-        updateService.StartAutoCheck();
-
-        _log.Info("App update service started");
-    }
-
-    /// <summary>
-    /// Update check started event handler
-    /// </summary>
-    private void OnUpdateCheckStarted(object? sender, EventArgs e)
-    {
-        Dispatcher.Invoke(() =>
-        {
-            TxtUpdateChecking.Visibility = Visibility.Visible;
-            BtnCheckUpdate.IsEnabled = false;
-        });
-    }
-
-    /// <summary>
-    /// Update check completed event handler
-    /// </summary>
-    private void OnUpdateCheckCompleted(object? sender, UpdateCheckEventArgs e)
-    {
-        Dispatcher.Invoke(() =>
-        {
-            TxtUpdateChecking.Visibility = Visibility.Collapsed;
-            BtnCheckUpdate.IsEnabled = true;
-
-            // Update last check time
-            UpdateLastCheckTimeDisplay();
-
-            if (e.IsUpdateAvailable && e.UpdateInfo != null)
-            {
-                // Show "Update to vX.X.X" button
-                TxtUpdateVersion.Text = $"v{e.UpdateInfo.Version}";
-                BtnUpdateAvailable.Visibility = Visibility.Visible;
-                BtnCheckUpdate.Visibility = Visibility.Collapsed;
-
-                // Update status to show update available
-                TxtUpdateStatus.Text = _loc.CurrentLanguage switch
-                {
-                    AppLanguage.KO => "업데이트 있음",
-                    AppLanguage.JA => "更新あり",
-                    _ => "Update available"
-                };
-                TxtUpdateStatus.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFA726"));
-
-                _log.Info($"Update available: {e.UpdateInfo.Version}");
-            }
-            else if (e.Error != null)
-            {
-                // Show error status
-                TxtUpdateStatus.Text = _loc.CurrentLanguage switch
-                {
-                    AppLanguage.KO => "확인 실패",
-                    AppLanguage.JA => "確認失敗",
-                    _ => "Check failed"
-                };
-                TxtUpdateStatus.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#EF5350"));
-
-                _log.Warning($"Update check failed: {e.Error.Message}");
-            }
-            else
-            {
-                // No update available, keep showing "Check Update" button
-                BtnUpdateAvailable.Visibility = Visibility.Collapsed;
-                BtnCheckUpdate.Visibility = Visibility.Visible;
-
-                // Update status to show up to date
-                TxtUpdateStatus.Text = _loc.CurrentLanguage switch
-                {
-                    AppLanguage.KO => "최신 버전",
-                    AppLanguage.JA => "最新版",
-                    _ => "Up to date"
-                };
-                TxtUpdateStatus.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4CAF50"));
-            }
-        });
-    }
-
-    /// <summary>
-    /// Update the last check time display
-    /// </summary>
-    private void UpdateLastCheckTimeDisplay()
-    {
-        var lastCheck = UpdateService.Instance.LastCheckTime;
-        if (lastCheck.HasValue)
-        {
-            var timeAgo = DateTime.Now - lastCheck.Value;
-            string timeText;
-
-            if (timeAgo.TotalSeconds < 60)
-            {
-                timeText = _loc.CurrentLanguage switch
-                {
-                    AppLanguage.KO => "방금 전",
-                    AppLanguage.JA => "たった今",
-                    _ => "just now"
-                };
-            }
-            else if (timeAgo.TotalMinutes < 60)
-            {
-                var mins = (int)timeAgo.TotalMinutes;
-                timeText = _loc.CurrentLanguage switch
-                {
-                    AppLanguage.KO => $"{mins}분 전",
-                    AppLanguage.JA => $"{mins}分前",
-                    _ => $"{mins}m ago"
-                };
-            }
-            else
-            {
-                timeText = lastCheck.Value.ToString("HH:mm");
-            }
-
-            TxtLastCheckTime.Text = $"({timeText})";
-        }
-        else
-        {
-            TxtLastCheckTime.Text = "";
-        }
-    }
-
-    /// <summary>
-    /// Check Update button click
-    /// </summary>
-    private async void BtnCheckUpdate_Click(object sender, RoutedEventArgs e)
-    {
-        _log.Debug("Manual update check triggered");
-        await UpdateService.Instance.CheckForUpdateAsync();
-    }
-
-    /// <summary>
-    /// Update Available button click - starts the update
-    /// </summary>
-    private void BtnUpdateAvailable_Click(object sender, RoutedEventArgs e)
-    {
-        var updateInfo = UpdateService.Instance.AvailableUpdate;
-        if (updateInfo != null)
-        {
-            _log.Info($"User initiated update to version {updateInfo.Version}");
-            UpdateService.Instance.StartUpdate();
-        }
-    }
-
-    #endregion
 }

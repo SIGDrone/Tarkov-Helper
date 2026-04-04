@@ -75,6 +75,7 @@ public class MapSettings
     private const string KeyMapLastZoomLevel = "map.lastZoomLevel";
     private const string KeyMapLastTranslateX = "map.lastTranslateX";
     private const string KeyMapLastTranslateY = "map.lastTranslateY";
+    private const string KeyMapCustomMarkersPanelCollapsed = "map.customMarkersCollapsed";
 
     #endregion
 
@@ -145,6 +146,7 @@ public class MapSettings
     private double? _lastZoomLevel;
     private double? _lastTranslateX;
     private double? _lastTranslateY;
+    private bool? _customMarkersPanelCollapsed;
 
     #endregion
 
@@ -1061,6 +1063,23 @@ public class MapSettings
         }
     }
 
+    public bool IsCustomMarkersPanelCollapsed
+    {
+        get
+        {
+            EnsureLoaded();
+            return _customMarkersPanelCollapsed ?? false;
+        }
+        set
+        {
+            if (_customMarkersPanelCollapsed != value)
+            {
+                _customMarkersPanelCollapsed = value;
+                SaveSetting(KeyMapCustomMarkersPanelCollapsed, value.ToString());
+            }
+        }
+    }
+
     #endregion
 
     #region Properties - Tracking
@@ -1421,6 +1440,9 @@ public class MapSettings
 
             if (double.TryParse(_userDataDb.GetSetting(KeyMapLastTranslateY), out var lastTranslateY))
                 _lastTranslateY = lastTranslateY;
+
+            if (bool.TryParse(_userDataDb.GetSetting(KeyMapCustomMarkersPanelCollapsed), out var customMarkersCollapsed))
+                _customMarkersPanelCollapsed = customMarkersCollapsed;
         }
         catch (Exception ex)
         {

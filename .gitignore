@@ -135,3 +135,12 @@ $RECYCLE.BIN/
 nul
 
 _NCrunch*
+
+# Tarkov Helper User Data
+user_data.db
+*.db-shm
+*.db-wal
+logs/
+*.log
+BuildOutput/
+Build_Final/

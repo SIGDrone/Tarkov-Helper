@@ -168,7 +168,7 @@ public class MapQuestMarkerManager
         foreach (var objective in _currentMapObjectives)
         {
             // ObjectiveId 기반으로 완료 상태 확인 (동일 설명 목표 개별 추적)
-            var isCompleted = _progressService.IsObjectiveCompletedById(objective.ObjectiveId);
+            var isCompleted = ObjectiveProgressService.Instance.IsObjectiveCompletedById(objective.ObjectiveId);
             objective.IsCompleted = isCompleted;
 
             // 완료된 목표 숨기기 설정이 활성화되어 있으면 스킵
@@ -748,7 +748,7 @@ public class MapQuestMarkerManager
             ? objective.TaskNameKo
             : objective.TaskName;
         var floorIndicator = !isOnCurrentFloor ? " ⬆⬇" : "";
-        container.ToolTip = $"[Area] {tooltipName}\n{tooltipDesc}{floorIndicator}";
+        container.ToolTip = $"[영역] {tooltipName}\n{tooltipDesc}{floorIndicator}";
 
         return container;
     }
@@ -804,7 +804,7 @@ public class MapQuestMarkerManager
         // OR 레이블
         var orLabel = new TextBlock
         {
-            Text = $"OR{orIndex}",
+            Text = $"선택{orIndex}",
             FontSize = _questNameTextSize * 0.9,
             FontWeight = FontWeights.Bold,
             Foreground = Brushes.White
@@ -904,7 +904,7 @@ public class MapQuestMarkerManager
             ? objective.TaskNameKo
             : objective.TaskName;
         var floorIndicator = !isOnCurrentFloor ? " ⬆⬇" : "";
-        canvas.ToolTip = $"[OR{orIndex}] {tooltipName}\n{tooltipDesc}{floorIndicator}";
+        canvas.ToolTip = $"[선택{orIndex}] {tooltipName}\n{tooltipDesc}{floorIndicator}";
 
         return canvas;
     }
@@ -1735,7 +1735,7 @@ public class MapQuestMarkerManager
         }
         else
         {
-            floorText = (markerOrder + 1).ToString(); // Order 1 = 2층
+            floorText = $"{markerOrder + 1}F"; // Order 1 = 2층
         }
 
         return (arrow, floorText, color);

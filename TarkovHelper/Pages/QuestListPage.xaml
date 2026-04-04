@@ -65,7 +65,7 @@
                             Background="#9C27B0"
                             VerticalAlignment="Center" Margin="0,0,6,0"
                             Visibility="{Binding KappaBadgeVisibility}"
-                            ToolTip="Required for Kappa Container">
+                            ToolTip="카파 컨테이너 필수 퀘스트">
                         <TextBlock Text="κ" FontSize="{DynamicResource FontSizeTiny}"
                                    Foreground="White" FontWeight="Bold"/>
                     </Border>
@@ -79,7 +79,7 @@
                     </Border>
 
                     <!-- Complete Button -->
-                    <Button Grid.Column="4" Content="Done" Padding="8,4"
+                    <Button Grid.Column="4" Content="완료" Padding="8,4"
                             FontSize="{DynamicResource FontSizeTiny}" MinWidth="50"
                             Click="CompleteButton_Click"
                             Tag="{Binding}"
@@ -148,42 +148,42 @@
                          Margin="0,0,16,0">
                     <TextBox.Style>
                         <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
-                            <Setter Property="Tag" Value="Search quests..."/>
+                            <Setter Property="Tag" Value="퀘스트 검색..."/>
                         </Style>
                     </TextBox.Style>
                 </TextBox>
 
                 <!-- Filter Toggles -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
-                    <CheckBox x:Name="ChkKappaOnly" Content="Kappa"
+                    <CheckBox x:Name="ChkKappaOnly" Content="카파"
                               Style="{StaticResource FilterCheckBox}"
                               Checked="Filter_Changed" Unchecked="Filter_Changed"/>
 
-                    <CheckBox x:Name="ChkItemRequired" Content="Item Req"
+                    <CheckBox x:Name="ChkItemRequired" Content="아이템 필요"
                               Style="{StaticResource FilterCheckBox}"
                               Checked="Filter_Changed" Unchecked="Filter_Changed"/>
 
                     <!-- Trader Filter -->
                     <ComboBox x:Name="CmbTrader" Width="120" Margin="0,0,16,0"
                               SelectionChanged="CmbTrader_SelectionChanged">
-                        <ComboBoxItem Content="All Traders" Tag="" IsSelected="True"/>
+                        <ComboBoxItem Content="모든 상인" Tag="" IsSelected="True"/>
                     </ComboBox>
 
                     <!-- Map Filter -->
                     <ComboBox x:Name="CmbMap" Width="120" Margin="0,0,16,0"
                               SelectionChanged="CmbMap_SelectionChanged">
-                        <ComboBoxItem Content="All Maps" Tag="" IsSelected="True"/>
+                        <ComboBoxItem Content="모든 지도" Tag="" IsSelected="True"/>
                     </ComboBox>
 
                     <!-- Status Filter -->
                     <ComboBox x:Name="CmbStatus" Width="110"
                               SelectionChanged="CmbStatus_SelectionChanged">
-                        <ComboBoxItem Content="Active" Tag="Active" IsSelected="True"/>
-                        <ComboBoxItem Content="All" Tag="All"/>
-                        <ComboBoxItem Content="Locked" Tag="Locked"/>
-                        <ComboBoxItem Content="Done" Tag="Done"/>
-                        <ComboBoxItem Content="Failed" Tag="Failed"/>
-                        <ComboBoxItem Content="Unavailable" Tag="Unavailable"/>
+                        <ComboBoxItem Content="진행 중" Tag="Active" IsSelected="True"/>
+                        <ComboBoxItem Content="전체" Tag="All"/>
+                        <ComboBoxItem Content="잠김" Tag="Locked"/>
+                        <ComboBoxItem Content="완료" Tag="Done"/>
+                        <ComboBoxItem Content="실패" Tag="Failed"/>
+                        <ComboBoxItem Content="수행 불가능" Tag="Unavailable"/>
                     </ComboBox>
 
                     <!-- Faction Toggle -->
@@ -343,24 +343,24 @@
 
                             <!-- Actions (Top) -->
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                                <Button x:Name="BtnWiki" Content="Wiki" Padding="12,6"
+                                <Button x:Name="BtnWiki" Content="위키" Padding="12,6"
                                         Margin="0,0,8,0" Click="BtnWiki_Click"/>
-                                <Button x:Name="BtnShowOnMap" Content="Show on Map" Padding="12,6"
+                                <Button x:Name="BtnShowOnMap" Content="지도에서 보기" Padding="12,6"
                                         Margin="0,0,8,0" Click="BtnShowOnMap_Click"
-                                        ToolTip="Show quest markers on the map"/>
-                                <Button x:Name="BtnComplete" Content="Mark Complete" Padding="12,6"
+                                        ToolTip="지도에 퀘스트 마커 표시"/>
+                                <Button x:Name="BtnComplete" Content="완료 처리" Padding="12,6"
                                         Margin="0,0,8,0" Click="BtnComplete_Click"/>
-                                <Button x:Name="BtnReset" Content="Reset" Padding="12,6"
+                                <Button x:Name="BtnReset" Content="초기화" Padding="12,6"
                                         Click="BtnReset_Click"/>
                             </StackPanel>
 
                             <!-- Trader & Status -->
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                <TextBlock Text="Trader: " FontSize="{DynamicResource FontSizeXSmall}"
+                                <TextBlock Text="상인: " FontSize="{DynamicResource FontSizeXSmall}"
                                            Foreground="{StaticResource TextSecondaryBrush}"/>
                                 <TextBlock x:Name="TxtDetailTrader" FontSize="{DynamicResource FontSizeXSmall}"
                                            Foreground="{StaticResource TextPrimaryBrush}"/>
-                                <TextBlock Text="  |  Status: " FontSize="{DynamicResource FontSizeXSmall}"
+                                <TextBlock Text="  |  상태: " FontSize="{DynamicResource FontSizeXSmall}"
                                            Foreground="{StaticResource TextSecondaryBrush}" Margin="8,0,0,0"/>
                                 <Border x:Name="DetailStatusBadge" Padding="6,2" CornerRadius="3">
                                     <TextBlock x:Name="TxtDetailStatus" FontSize="{DynamicResource FontSizeTiny}"
@@ -370,7 +370,7 @@
 
                             <!-- Map -->
                             <StackPanel x:Name="MapInfoPanel" Orientation="Horizontal" Margin="0,0,0,16">
-                                <TextBlock Text="Map: " FontSize="{DynamicResource FontSizeXSmall}"
+                                <TextBlock Text="지도: " FontSize="{DynamicResource FontSizeXSmall}"
                                            Foreground="{StaticResource TextSecondaryBrush}"/>
                                 <TextBlock x:Name="TxtDetailMap" FontSize="{DynamicResource FontSizeXSmall}"
                                            Foreground="{StaticResource TextPrimaryBrush}"/>
@@ -384,7 +384,7 @@
                             <StackPanel>
                                 <!-- Required Items Section -->
                                 <StackPanel x:Name="RequiredItemsSectionWrapper" Visibility="Collapsed">
-                                    <TextBlock Text="Required Items" FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
+                                    <TextBlock Text="필요 아이템" FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
                                                Foreground="{StaticResource TextPrimaryBrush}"
                                                Margin="0,0,0,8"
                                                x:Name="TxtRequiredItemsHeader"/>
@@ -447,7 +447,8 @@
                                                                 <Border Padding="4,1" CornerRadius="2" Margin="8,0,0,0"
                                                                         Background="{StaticResource WarningBrush}"
                                                                         Visibility="{Binding FirVisibility}">
-                                                                    <TextBlock Text="FIR" FontSize="{DynamicResource FontSizeTiny}" Foreground="White"/>
+                                                                    <TextBlock Text="FIR" FontSize="{DynamicResource FontSizeTiny}" Foreground="White"
+                                                                               ToolTip="레이드에서 발견 필요 (Found in Raid)"/>
                                                                 </Border>
                                                             </StackPanel>
                                                             <TextBlock Text="{Binding RequirementType}" FontSize="{DynamicResource FontSizeTiny}"
@@ -463,7 +464,7 @@
 
                                 <!-- Kappa Progress Section (for Collector quest) -->
                                 <StackPanel x:Name="KappaProgressSection" Visibility="Collapsed" Margin="0,0,0,16">
-                                    <TextBlock Text="Kappa Progress" FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
+                                    <TextBlock Text="카파 진행도" FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
                                                Foreground="{StaticResource TextPrimaryBrush}"
                                                Margin="0,0,0,8"/>
                                     <Border Background="{StaticResource BackgroundDarkBrush}"
@@ -483,7 +484,7 @@
                                                            FontSize="{DynamicResource FontSizeTiny}" FontWeight="SemiBold" Foreground="White"/>
                                             </Grid>
                                             <!-- Show All Button -->
-                                            <Button x:Name="BtnShowKappaQuests" Content="Show All Required Quests"
+                                            <Button x:Name="BtnShowKappaQuests" Content="필수 퀘스트 전체 보기"
                                                     Padding="8,4" Click="BtnShowKappaQuests_Click"/>
                                         </StackPanel>
                                     </Border>
@@ -491,7 +492,7 @@
 
                                 <!-- Requirements Section -->
                                 <StackPanel x:Name="RequirementsSectionWrapper" Visibility="Collapsed">
-                                    <TextBlock Text="Requirements" FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
+                                    <TextBlock Text="요구 사항" FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
                                                Foreground="{StaticResource TextPrimaryBrush}"
                                                Margin="0,0,0,8"/>
                                     <Border Background="{StaticResource BackgroundDarkBrush}"
@@ -509,7 +510,7 @@
 
                                 <!-- Objectives Section -->
                                 <StackPanel x:Name="ObjectivesSection" Visibility="Collapsed">
-                                    <TextBlock Text="Objectives" FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
+                                    <TextBlock Text="목표" FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
                                                Foreground="{StaticResource TextPrimaryBrush}"
                                                Margin="0,0,0,8"/>
                                     <Border Background="{StaticResource BackgroundDarkBrush}"
@@ -525,7 +526,7 @@
 
                                 <!-- Guide Section -->
                                 <StackPanel x:Name="GuideSection" Visibility="Collapsed">
-                                    <TextBlock Text="Guide" FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
+                                    <TextBlock Text="가이드" FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
                                                Foreground="{StaticResource TextPrimaryBrush}"
                                                Margin="0,0,0,8"/>
                                     <Border Background="{StaticResource BackgroundDarkBrush}"
@@ -550,7 +551,7 @@
                                                       Visibility="Collapsed"
                                                       Expanded="GuideImagesExpander_Expanded">
                                                 <Expander.Header>
-                                                    <TextBlock x:Name="TxtGuideImagesHeader" Text="View Images" FontSize="{DynamicResource FontSizeTiny}"
+                                                    <TextBlock x:Name="TxtGuideImagesHeader" Text="이미지 보기" FontSize="{DynamicResource FontSizeTiny}"
                                                                Foreground="{StaticResource TextSecondaryBrush}"/>
                                                 </Expander.Header>
                                                 <ItemsControl x:Name="GuideImagesList" Margin="0,8,0,0">
@@ -574,7 +575,7 @@
                                                                                 <ProgressBar IsIndeterminate="True"
                                                                                              Width="60" Height="4"
                                                                                              Margin="0,0,0,6"/>
-                                                                                <TextBlock Text="Loading..."
+                                                                                <TextBlock Text="로딩 중..."
                                                                                            FontSize="{DynamicResource FontSizeTiny}"
                                                                                            Foreground="{StaticResource TextSecondaryBrush}"
                                                                                            HorizontalAlignment="Center"/>
@@ -604,7 +605,7 @@
 
                                 <!-- Prerequisites Section -->
                                 <StackPanel x:Name="PrerequisitesSectionWrapper" Visibility="Collapsed">
-                                    <TextBlock Text="Prerequisites" FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
+                                    <TextBlock Text="선행 퀘스트" FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
                                                Foreground="{StaticResource TextPrimaryBrush}"
                                                Margin="0,0,0,8"/>
                                     <Border Background="{StaticResource BackgroundDarkBrush}"
@@ -621,7 +622,7 @@
                                                             <Border Visibility="{Binding OrLabelVisibility}"
                                                                     Background="#2196F3" Padding="6,2" CornerRadius="3"
                                                                     HorizontalAlignment="Left" Margin="0,0,0,4">
-                                                                <TextBlock Text="OR Group" FontSize="{DynamicResource FontSizeTiny}"
+                                                                <TextBlock Text="선택 그룹 (OR)" FontSize="{DynamicResource FontSizeTiny}"
                                                                            Foreground="White" FontWeight="SemiBold"/>
                                                             </Border>
                                                             <!-- Items in group -->
@@ -630,7 +631,7 @@
                                                                     <DataTemplate>
                                                                         <StackPanel Orientation="Horizontal" Margin="0,2">
                                                                             <!-- OR separator for 2nd+ items -->
-                                                                            <TextBlock Text="OR " Foreground="#2196F3" FontWeight="Bold"
+                                                                            <TextBlock Text="또는 " Foreground="#2196F3" FontWeight="Bold"
                                                                                        FontSize="{DynamicResource FontSizeXSmall}"
                                                                                        Visibility="{Binding OrSeparatorVisibility}"
                                                                                        Margin="0,0,4,0"/>
@@ -672,18 +673,18 @@
                                 <!-- Alternative Quests Section (Mutually Exclusive) -->
                                 <StackPanel x:Name="AlternativeQuestsSectionWrapper" Visibility="Collapsed">
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                        <TextBlock Text="Other Choices" FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
+                                        <TextBlock Text="다른 선택지" FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
                                                    Foreground="{StaticResource TextPrimaryBrush}"/>
                                         <Border Padding="6,2" CornerRadius="3" Margin="8,0,0,0"
                                                 Background="#FF5722">
-                                            <TextBlock Text="Mutually Exclusive" FontSize="{DynamicResource FontSizeTiny}"
+                                            <TextBlock Text="상호 배타적" FontSize="{DynamicResource FontSizeTiny}"
                                                        Foreground="White" FontWeight="SemiBold"/>
                                         </Border>
                                     </StackPanel>
                                     <Border Background="{StaticResource BackgroundDarkBrush}"
                                             CornerRadius="4" Padding="12" Margin="0,0,0,16">
                                         <StackPanel>
-                                            <TextBlock Text="Completing this quest will FAIL the following quests:"
+                                            <TextBlock Text="이 퀘스트를 완료하면 다음 퀘스트들이 실패 처리됩니다:"
                                                        FontSize="{DynamicResource FontSizeTiny}"
                                                        Foreground="#FF5722" FontStyle="Italic"
                                                        Margin="0,0,0,8"/>
