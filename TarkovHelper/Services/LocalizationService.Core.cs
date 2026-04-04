@@ -96,7 +96,6 @@ public partial class LocalizationService : INotifyPropertyChanged
     public string QuestLogSync => "퀘스트 로그 동기화";
     public string CacheManagement => "캐시 관리";
     public string FontSize => "글꼴 크기";
-    public string DataMigration => "데이터 가져오기";
     public string Unknown => "알 수 없음";
     public string UpdateApiData => "API 데이터 업데이트";
     public string ApiUpdateCheck => "업데이트 확인 중...";

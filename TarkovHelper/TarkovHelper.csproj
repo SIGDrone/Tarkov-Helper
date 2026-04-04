@@ -9,9 +9,9 @@
     <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
 
     <!-- Version Info for Auto-Update -->
-    <Version>4.3.1</Version>
-    <AssemblyVersion>4.3.1</AssemblyVersion>
-    <FileVersion>4.3.1</FileVersion>
+    <Version>1.0.1</Version>
+    <AssemblyVersion>1.0.1</AssemblyVersion>
+    <FileVersion>1.0.1</FileVersion>
     <ApplicationIcon>1764579946.ico</ApplicationIcon>
 
     <!-- AutoUpdater.NET 다국어 리소스 제한 (ko만 유지) -->

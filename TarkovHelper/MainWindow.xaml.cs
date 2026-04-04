@@ -1744,87 +1744,6 @@ public partial class MainWindow : Window
 
     #endregion
 
-    #region Data Migration
-
-    /// <summary>
-    /// Open folder dialog to select Config folder for migration
-    /// </summary>
-    private async void BtnDataMigration_Click(object sender, RoutedEventArgs e)
-    {
-        var dialog = new Microsoft.Win32.OpenFolderDialog
-        {
-            Title = "이전 버전 Config 폴더 선택"
-        };
-
-        if (dialog.ShowDialog() != true) return;
-
-        var selectedPath = dialog.FolderName;
-        var migrationService = ConfigMigrationService.Instance;
-
-        // Validate folder
-        if (!migrationService.IsValidConfigFolder(selectedPath))
-        {
-            MessageBox.Show(
-                "유효한 Config 폴더가 아닙니다.\nquest_progress.json, hideout_progress.json, item_inventory.json 또는 app_settings.json 파일이 필요합니다.",
-                "오류",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-            return;
-        }
-
-        // Preview migration
-        var preview = migrationService.PreviewMigration(selectedPath);
-
-        // Show confirmation
-        var confirmMessage = $"다음 데이터를 가져올 수 있습니다:\n\n" +
-                              $"- 퀘스트 진행: {preview.QuestProgressCount}개\n" +
-                              $"- 하이드아웃 진행: {preview.HideoutProgressCount}개\n" +
-                              $"- 아이템 인벤토리: {preview.ItemInventoryCount}개\n" +
-                              $"- 설정: {preview.SettingsCount}개\n\n" +
-                              "가져오기를 진행하시겠습니까?\n(기존 데이터를 덮어씁니다)";
-
-        var confirmResult = MessageBox.Show(
-            confirmMessage,
-            "데이터 가져오기",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Question);
-
-        if (confirmResult != MessageBoxResult.Yes) return;
-
-        // Hide settings overlay
-        HideSettingsOverlay();
-
-        // Show loading overlay
-        ShowLoadingOverlay("데이터 마이그레이션 중...");
-
-        try
-        {
-            var progress = new Progress<string>(message =>
-            {
-                Dispatcher.Invoke(() => UpdateLoadingStatus(message));
-            });
-
-            var result = await migrationService.MigrateFromConfigFolderAsync(selectedPath, progress);
-
-            // 즉시 LoadingOverlay 숨기기 (애니메이션 충돌 방지)
-            LoadingOverlay.Visibility = Visibility.Collapsed;
-
-            // Show result popup
-            ShowMigrationResultDialog(result);
-
-            // Reload pages to reflect new data
-            await LoadAndShowQuestListAsync();
-        }
-        catch (Exception ex)
-        {
-            HideLoadingOverlay();
-            MessageBox.Show(
-                $"데이터 가져오기 실패: {ex.Message}",
-                "오류",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
-        }
-    }
 
     /// <summary>
     /// Show migration result dialog
@@ -1833,7 +1752,4 @@ public partial class MainWindow : Window
     {
         MigrationResultDialog.Show(result, this);
     }
-
-    #endregion
-
 }

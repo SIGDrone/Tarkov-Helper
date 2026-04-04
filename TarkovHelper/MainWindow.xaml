@@ -592,27 +592,7 @@
                                     </StackPanel>
                                 </Border>
 
-                                <!-- Data Migration Section -->
-                                <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}"
-                                        Margin="0,12,0,0" Padding="0,16,0,0">
-                                    <StackPanel>
-                                        <TextBlock x:Name="TxtDataMigrationLabel" Text="데이터 가져오기"
-                                                   FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
-                                                   Foreground="{StaticResource TextPrimaryBrush}"
-                                                   Margin="0,0,0,8"/>
 
-                                        <TextBlock x:Name="TxtDataMigrationDesc"
-                                                   Text="이전 버전(3.5 이하)의 TarkovHelper 데이터를 가져옵니다. 이전 설치 경로의 Config 폴더를 선택하세요."
-                                                   FontSize="{DynamicResource FontSizeXSmall}"
-                                                   Foreground="{StaticResource TextSecondaryBrush}"
-                                                   TextWrapping="Wrap"
-                                                   Margin="0,0,0,12"/>
-
-                                        <Button x:Name="BtnDataMigration" Content="Config에서 가져오기..."
-                                                Padding="12,8" HorizontalAlignment="Left"
-                                                Click="BtnDataMigration_Click"/>
-                                    </StackPanel>
-                                </Border>
                             </StackPanel>
                         </Grid>
                     </ScrollViewer>

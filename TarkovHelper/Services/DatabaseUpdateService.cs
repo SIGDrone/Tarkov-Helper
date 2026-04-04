@@ -16,6 +16,7 @@ public sealed class DatabaseUpdateService : IDisposable
     private static DatabaseUpdateService? _instance;
     public static DatabaseUpdateService Instance => _instance ??= new DatabaseUpdateService();
 
+    private const string TARKOV_DEV_API_URL = "https://api.tarkov.dev/graphql";
     private const string VERSION_URL = "https://raw.githubusercontent.com/Zeliper/Tarkov-Item-Helper/refs/heads/main/TarkovHelper/Assets/db_version.txt";
     private const string DATABASE_URL = "https://raw.githubusercontent.com/Zeliper/Tarkov-Item-Helper/refs/heads/main/TarkovHelper/Assets/tarkov_data.db";
     private const string LOCAL_VERSION_FILE = "db_version.txt";
@@ -214,12 +215,22 @@ public sealed class DatabaseUpdateService : IDisposable
     }
 
     /// <summary>
-    /// 원격 버전 정보 가져오기
+    /// 원격 버전 정보 가져오기 (tarkov.dev API 우선)
     /// </summary>
     private async Task<string?> GetRemoteVersionAsync()
     {
         try
         {
+            // 1. tarkov.dev API에서 최신 데이터 상태 확인
+            var tarkovDevVersion = await GetTarkovDevStatusAsync();
+            if (!string.IsNullOrEmpty(tarkovDevVersion))
+            {
+                _log.Debug($"Latest tarkov.dev updated at: {tarkovDevVersion}");
+                return tarkovDevVersion;
+            }
+            
+            // 2. 실패 시 GitHub의 정적 버전 파일 확인 (폴백)
+            _log.Debug("Falling back to GitHub version check...");
             var response = await _httpClient.GetStringAsync(VERSION_URL);
             return response.Trim();
         }
@@ -228,6 +239,37 @@ public sealed class DatabaseUpdateService : IDisposable
             _log.Warning($"Failed to get remote version: {ex.Message}");
             return null;
         }
+    }
+
+    /// <summary>
+    /// tarkov.dev GraphQL API를 사용하여 최신 데이터 업데이트 시각 가져오기
+    /// </summary>
+    private async Task<string?> GetTarkovDevStatusAsync()
+    {
+        try
+        {
+            var query = "{ \"query\": \"{ tarkovDataStatus { updated } }\" }";
+            var content = new StringContent(query, System.Text.Encoding.UTF8, "application/json");
+
+            var response = await _httpClient.PostAsync(TARKOV_DEV_API_URL, content);
+            response.EnsureSuccessStatusCode();
+
+            var json = await response.Content.ReadAsStringAsync();
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            
+            if (doc.RootElement.TryGetProperty("data", out var data) &&
+                data.TryGetProperty("tarkovDataStatus", out var status) &&
+                status.TryGetProperty("updated", out var updated))
+            {
+                return updated.GetString();
+            }
+        }
+        catch (Exception ex)
+        {
+            _log.Warning($"Tarkov.dev status check failed: {ex.Message}");
+        }
+
+        return null;
     }
 
     /// <summary>
