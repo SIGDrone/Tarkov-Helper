@@ -13,10 +13,10 @@ namespace TarkovHelper.Services
         private static ItemsDataService? _instance;
         public static ItemsDataService Instance => _instance ??= new ItemsDataService();
 
-        private readonly QuestProgressService _questProgressService = QuestProgressService.Instance;
-        private readonly HideoutProgressService _hideoutProgressService = HideoutProgressService.Instance;
-        private readonly QuestGraphService _questGraphService = QuestGraphService.Instance;
-        private readonly LocalizationService _loc = LocalizationService.Instance;
+        private QuestProgressService _questProgressService => QuestProgressService.Instance;
+        private HideoutProgressService _hideoutProgressService => HideoutProgressService.Instance;
+        private QuestGraphService _questGraphService => QuestGraphService.Instance;
+        private LocalizationService _loc => LocalizationService.Instance;
 
         private static readonly HashSet<string> CurrencyItems = new(StringComparer.OrdinalIgnoreCase)
         {

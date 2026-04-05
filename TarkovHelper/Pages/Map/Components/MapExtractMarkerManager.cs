@@ -43,7 +43,7 @@ public class MapExtractMarkerManager
         MapTrackerService trackerService,
         ExtractService extractService,
         LocalizationService localizationService)
-    {
+    { 
         _markersContainer = markersContainer ?? throw new ArgumentNullException(nameof(markersContainer));
         _trackerService = trackerService ?? throw new ArgumentNullException(nameof(trackerService));
         _extractService = extractService ?? throw new ArgumentNullException(nameof(extractService));
@@ -96,7 +96,7 @@ public class MapExtractMarkerManager
 
     #region Public Methods - Marker Management
 
-    public void RefreshMarkers()
+    public async Task RefreshMarkersAsync(CancellationToken ct = default)
     {
         if (string.IsNullOrEmpty(_currentMapKey)) return;
         if (!_extractService.IsLoaded) return;
@@ -110,37 +110,24 @@ public class MapExtractMarkerManager
         var config = _trackerService.GetMapConfig(_currentMapKey);
         if (config == null) return;
 
-        // 디버그: CalibratedTransform 확인
-        if (config.CalibratedTransform == null)
-        {
-            System.Diagnostics.Debug.WriteLine($"[MapExtractMarkerManager] WARNING: CalibratedTransform is NULL for map '{_currentMapKey}'");
-        }
-        else
-        {
-            System.Diagnostics.Debug.WriteLine($"[MapExtractMarkerManager] CalibratedTransform for '{_currentMapKey}': [{string.Join(", ", config.CalibratedTransform)}]");
-        }
-
         // 현재 맵의 탈출구 가져오기 (MapConfig의 Aliases 사용)
         var extracts = _extractService.GetExtractsForMap(_currentMapKey, config);
 
-        // 디버그: 로드된 탈출구 목록 출력
-        System.Diagnostics.Debug.WriteLine($"[MapExtractMarkerManager] Loaded {extracts.Count} extracts for '{_currentMapKey}':");
-        foreach (var e in extracts)
-        {
-            System.Diagnostics.Debug.WriteLine($"  - {e.Name} ({e.Faction}) FloorId={e.FloorId ?? "null"}");
-        }
-
+        int count = 0;
         // 모든 탈출구를 개별적으로 표시 (그룹화 없음)
         foreach (var extract in extracts)
         {
+            // [v1.1.37] UI 부하 분산
+            count++;
+            if (count % 20 == 0) await Task.Yield();
+
+            ct.ThrowIfCancellationRequested();
+
             // 진영 필터 적용
             if (!ShouldShowExtract(extract.Faction)) continue;
 
             // TarkovDBEditor 방식: config.GameToScreenForPlayer 사용
             var (screenX, screenY) = config.GameToScreenForPlayer(extract.X, extract.Z);
-
-            // 디버그: 탈출구 좌표 변환 결과 출력
-            System.Diagnostics.Debug.WriteLine($"[MapExtractMarkerManager] Extract '{extract.Name}': Game({extract.X:F2}, {extract.Z:F2}) -> Screen({screenX:F2}, {screenY:F2})");
 
             var screenPos = new ScreenPosition
             {
@@ -182,7 +169,7 @@ public class MapExtractMarkerManager
     #region Private Methods - Marker Creation
 
     private FrameworkElement CreateExtractMarker(MapExtract extract, ScreenPosition screenPos, ExtractFaction? overrideFaction = null, bool isOnCurrentFloor = true)
-    {
+    { 
         // 맵별 마커 스케일 적용
         var mapConfig = _trackerService.GetMapConfig(_currentMapKey ?? "");
         var mapScale = mapConfig?.MarkerScale ?? 1.0;
@@ -204,7 +191,7 @@ public class MapExtractMarkerManager
         }
 
         var canvas = new Canvas
-        {
+        { 
             Width = 0,
             Height = 0,
             Tag = extract
@@ -219,19 +206,19 @@ public class MapExtractMarkerManager
 
         // 이름과 층 뱃지를 담을 StackPanel
         var labelStackPanel = new StackPanel
-        {
+        { 
             Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Center
         };
 
         // 이름 라벨
         var nameLabel = new Border
-        {
+        { 
             Background = new SolidColorBrush(Color.FromArgb(200, 30, 30, 30)),
             CornerRadius = new CornerRadius(3 * mapScale),
             Padding = new Thickness(4 * mapScale, 2 * mapScale, 4 * mapScale, 2 * mapScale),
             Child = new TextBlock
-            {
+            { 
                 Text = displayName,
                 FontSize = textSize,
                 FontWeight = FontWeights.SemiBold,
@@ -244,17 +231,17 @@ public class MapExtractMarkerManager
         // 층 뱃지 (다층 맵에서 다른 층일 때만 표시) - GetFloorIndicator 사용하여 화살표 포함
         var floorInfo = GetFloorIndicator(extract.FloorId);
         if (floorInfo.HasValue)
-        {
+        { 
             var (arrow, floorText, indicatorColor) = floorInfo.Value;
 
             var floorBadge = new Border
-            {
+            { 
                 Background = new SolidColorBrush(indicatorColor),
                 CornerRadius = new CornerRadius(3 * mapScale),
                 Padding = new Thickness(4 * mapScale, 2 * mapScale, 4 * mapScale, 2 * mapScale),
                 Margin = new Thickness(3 * mapScale, 0, 0, 0),
                 Child = new TextBlock
-                {
+                { 
                     Text = $"{arrow}{floorText}",
                     FontSize = textSize * 0.9,
                     FontWeight = FontWeights.Bold,
@@ -276,7 +263,7 @@ public class MapExtractMarkerManager
         // 배경 원 (글로우 효과)
         var glowSize = markerSize * 1.5;
         var glow = new Ellipse
-        {
+        { 
             Width = glowSize,
             Height = glowSize,
             Fill = new SolidColorBrush(Color.FromArgb(80, fillColor.R, fillColor.G, fillColor.B))
@@ -287,7 +274,7 @@ public class MapExtractMarkerManager
 
         // 메인 원
         var mainCircle = new Ellipse
-        {
+        { 
             Width = markerSize,
             Height = markerSize,
             Fill = new SolidColorBrush(fillColor),
@@ -316,7 +303,7 @@ public class MapExtractMarkerManager
 
         // 다른 층의 마커는 반투명 처리
         if (!isOnCurrentFloor)
-        {
+        { 
             canvas.Opacity = 0.5;
         }
 
@@ -332,7 +319,7 @@ public class MapExtractMarkerManager
     private static (Color fill, Color stroke) GetExtractStyle(ExtractFaction faction)
     {
         return faction switch
-        {
+        { 
             ExtractFaction.Pmc => (
                 Color.FromRgb(76, 175, 80),    // Green
                 Colors.White),
@@ -352,11 +339,11 @@ public class MapExtractMarkerManager
     }
 
     private static FrameworkElement CreateExtractIcon(double size, Color strokeColor)
-    {
+    { 
         // 비상대피 아이콘 (uxwing.com emergency-exit-icon)
         // 원본 viewBox: 0 0 108.01 122.88
         var path = new System.Windows.Shapes.Path
-        {
+        { 
             Fill = new SolidColorBrush(strokeColor),
             Stretch = Stretch.Uniform,
             Width = size,
@@ -379,12 +366,12 @@ public class MapExtractMarkerManager
     // 현재 사용하지 않지만, 향후 탈출구 그룹화가 필요할 경우를 위해 보존
 #pragma warning disable IDE0051 // 사용되지 않는 private 멤버 제거
     private List<List<MapExtract>> GroupExtractsByPosition(List<MapExtract> extracts)
-    {
+    { 
         var groups = new List<List<MapExtract>>();
         var used = new HashSet<string>();
 
         foreach (var extract in extracts)
-        {
+        { 
             if (used.Contains(extract.Id)) continue;
 
             var group = new List<MapExtract> { extract };
@@ -393,7 +380,7 @@ public class MapExtractMarkerManager
             // 같은 위치(근접)의 다른 탈출구 찾기
             // 단, PMC+Scav 공용 탈출구만 그룹화 (같은 이름 또는 다른 진영이면서 매우 가까운 경우)
             foreach (var other in extracts)
-            {
+            { 
                 if (used.Contains(other.Id)) continue;
 
                 // 거리 계산
@@ -408,7 +395,7 @@ public class MapExtractMarkerManager
                 var differentFaction = extract.Faction != other.Faction;
 
                 if (distance < 10 && (sameName || differentFaction))
-                {
+                { 
                     group.Add(other);
                     used.Add(other.Id);
                 }
@@ -421,9 +408,9 @@ public class MapExtractMarkerManager
     }
 
     private (MapExtract extract, ExtractFaction faction) DetermineExtractDisplay(List<MapExtract> group)
-    {
+    { 
         if (group.Count == 1)
-        {
+        { 
             // Shared 탈출구는 PMC로 처리
             var faction = group[0].Faction == ExtractFaction.Shared ? ExtractFaction.Pmc : group[0].Faction;
             return (group[0], faction);
@@ -434,7 +421,7 @@ public class MapExtractMarkerManager
         var hasScav = group.Any(e => e.Faction == ExtractFaction.Scav);
 
         if (hasPmc && hasScav)
-        {
+        { 
             // PMC 탈출구 정보를 기준으로, PMC로 표시
             var representative = group.FirstOrDefault(e => e.Faction == ExtractFaction.Pmc)
                 ?? group.FirstOrDefault(e => e.Faction == ExtractFaction.Shared)
@@ -455,7 +442,7 @@ public class MapExtractMarkerManager
     private bool ShouldShowExtract(ExtractFaction faction)
     {
         return faction switch
-        {
+        { 
             ExtractFaction.Pmc => _showPmcExtracts,
             ExtractFaction.Scav => _showScavExtracts,
             ExtractFaction.Shared => _showPmcExtracts, // Shared도 PMC 필터 사용
@@ -472,7 +459,7 @@ public class MapExtractMarkerManager
 
         // 마커에 층 정보가 없는 경우: 기본 층(main)으로 간주
         if (string.IsNullOrEmpty(markerFloorId))
-        {
+        { 
             // 현재 선택된 층이 main이면 표시, 아니면 다른 층으로 처리
             return string.Equals(_currentFloorId, "main", StringComparison.OrdinalIgnoreCase);
         }
@@ -482,7 +469,7 @@ public class MapExtractMarkerManager
     }
 
     private (string arrow, string floorText, Color color)? GetFloorIndicator(string? markerFloorId)
-    {
+    { 
         if (string.IsNullOrEmpty(_currentMapKey) || string.IsNullOrEmpty(_currentFloorId))
             return null;
 
@@ -517,15 +504,15 @@ public class MapExtractMarkerManager
         // 층 표시 문자 결정 (B: 지하, G: 기본층, 2/3: 2층/3층)
         string floorText;
         if (markerOrder < 0)
-        {
+        { 
             floorText = "B";
         }
         else if (markerOrder == 0)
-        {
+        { 
             floorText = "G";
         }
         else
-        {
+        { 
             floorText = $"{markerOrder + 1}F"; // Order 1 = 2층
         }
 

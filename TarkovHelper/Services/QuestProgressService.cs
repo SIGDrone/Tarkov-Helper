@@ -11,6 +11,14 @@ namespace TarkovHelper.Services
         private static QuestProgressService? _instance;
         public static QuestProgressService Instance => _instance ??= new QuestProgressService();
 
+        /// <summary>
+        /// 싱글톤 인스턴스를 파괴합니다. 프로필 전환 시 데이터 잔상을 방지하기 위해 사용합니다.
+        /// </summary>
+        public static void ResetInstance()
+        {
+            _instance = null;
+        }
+
         private Dictionary<string, QuestStatus> _questProgress = new();
         private Dictionary<string, TarkovTask> _tasksByNormalizedName = new();
         private Dictionary<string, TarkovTask> _tasksByBsgId = new();
@@ -19,6 +27,7 @@ namespace TarkovHelper.Services
 
         // V2 진행 데이터 (이중 키 저장)
         private QuestProgressDataV2 _progressDataV2 = new();
+        private ProfileType _loadedProfile = ProfileType.Pvp;
 
         /// <summary>
         /// 데이터 소스 (JSON 또는 DB)
@@ -30,7 +39,7 @@ namespace TarkovHelper.Services
         /// <summary>
         /// DB에서 퀘스트 데이터를 로드하고 초기화합니다.
         /// </summary>
-        public async Task<bool> InitializeFromDbAsync()
+        public async Task<bool> InitializeFromDbAsync(ProfileType? profileType = null)
         {
             var dbService = QuestDbService.Instance;
 
@@ -41,7 +50,7 @@ namespace TarkovHelper.Services
             }
 
             var tasks = dbService.AllQuests.ToList();
-            Initialize(tasks);
+            await InitializeAsync(tasks, profileType);
             IsLoadedFromDb = true;
 
             // V2 형식으로 진행 데이터 reconcile
@@ -125,9 +134,9 @@ namespace TarkovHelper.Services
         }
 
         /// <summary>
-        /// Initialize service with task data
+        /// Initialize service with task data (Asynchronous)
         /// </summary>
-        public void Initialize(List<TarkovTask> tasks)
+        public async Task InitializeAsync(List<TarkovTask> tasks, ProfileType? profileType = null)
         {
             _allTasks = tasks;
 
@@ -163,7 +172,8 @@ namespace TarkovHelper.Services
                 }
             }
 
-            LoadProgress();
+            _loadedProfile = profileType ?? ProfileService.Instance.CurrentProfile;
+            await LoadProgressAsync(profileType);
         }
 
         /// <summary>
@@ -633,10 +643,9 @@ namespace TarkovHelper.Services
             // Save and notify only once after all recursive completions
             if (changedQuests.Count > 0)
             {
-                System.Diagnostics.Debug.WriteLine($"[QuestProgressService] Saving {changedQuests.Count} changed quests (batch)");
-                // Fire-and-forget async save - don't block UI
-                _ = SaveProgressBatchAsync(changedQuests);
-                System.Diagnostics.Debug.WriteLine("[QuestProgressService] Progress save initiated");
+                // PVE/PVP 격리를 위해 로드된 프로필 정보를 명시적으로 전달
+                _ = SaveProgressBatchAsync(changedQuests, _loadedProfile);
+                System.Diagnostics.Debug.WriteLine($"[QuestProgressService] Progress save initiated for {_loadedProfile}");
                 ProgressChanged?.Invoke(this, EventArgs.Empty);
             }
             else
@@ -715,12 +724,13 @@ namespace TarkovHelper.Services
         /// <summary>
         /// Save changed quests in batch (fire-and-forget, doesn't block UI)
         /// </summary>
-        private async Task SaveProgressBatchAsync(List<(string Id, string? NormalizedName, QuestStatus Status)> changedQuests)
+        private async Task SaveProgressBatchAsync(List<(string Id, string? NormalizedName, QuestStatus Status)> changedQuests, ProfileType? profileType = null)
         {
             try
             {
-                await _userDataDb.SaveQuestProgressBatchAsync(changedQuests);
-                System.Diagnostics.Debug.WriteLine($"[QuestProgressService] Batch saved {changedQuests.Count} quest changes");
+                var targetProfile = profileType ?? _loadedProfile;
+                await _userDataDb.SaveQuestProgressBatchAsync(changedQuests, targetProfile);
+                System.Diagnostics.Debug.WriteLine($"[QuestProgressService] Batch saved {changedQuests.Count} quest changes for {targetProfile}");
             }
             catch (Exception ex)
             {
@@ -766,8 +776,8 @@ namespace TarkovHelper.Services
 
             if (changedQuests.Count > 0)
             {
-                System.Diagnostics.Debug.WriteLine($"[QuestProgressService] Batch completing {changedQuests.Count} quests");
-                _ = SaveProgressBatchAsync(changedQuests);
+                System.Diagnostics.Debug.WriteLine($"[QuestProgressService] Batch completing {changedQuests.Count} quests for {_loadedProfile}");
+                _ = SaveProgressBatchAsync(changedQuests, _loadedProfile);
                 ProgressChanged?.Invoke(this, EventArgs.Empty);
             }
         }
@@ -983,18 +993,19 @@ namespace TarkovHelper.Services
             ObjectiveProgressService.Instance.ClearAllProgress();
 
             // DB에서 모든 퀘스트 진행 데이터 삭제
-            Task.Run(async () =>
+            _ = Task.Run(async () =>
             {
                 try
                 {
-                    await _userDataDb.ClearAllQuestProgressAsync();
+                    var profileType = ProfileService.Instance.CurrentProfile;
+                    await _userDataDb.ClearAllQuestProgressAsync(profileType);
                     System.Diagnostics.Debug.WriteLine("[QuestProgressService] All progress cleared from DB");
                 }
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine($"[QuestProgressService] Reset failed: {ex.Message}");
                 }
-            }).GetAwaiter().GetResult();
+            });
 
             ProgressChanged?.Invoke(this, EventArgs.Empty);
         }
@@ -1104,14 +1115,16 @@ namespace TarkovHelper.Services
 
         private void SaveProgress()
         {
-            // DB에 저장 (Task.Run으로 데드락 방지)
-            Task.Run(async () => await SaveProgressToDbAsync()).GetAwaiter().GetResult();
+            // DB에 저장 (비동기로 실행)
+            var profileType = ProfileService.Instance.CurrentProfile;
+            _ = SaveProgressToDbAsync(profileType);
         }
 
-        private async Task SaveProgressToDbAsync()
+        private async Task SaveProgressToDbAsync(ProfileType profileType)
         {
             try
             {
+                var changedItems = new List<(string Id, string? NormalizedName, QuestStatus Status)>();
                 foreach (var kvp in _questProgress)
                 {
                     var normalizedName = kvp.Key;
@@ -1123,8 +1136,13 @@ namespace TarkovHelper.Services
                     {
                         id = task.Ids?.FirstOrDefault() ?? normalizedName;
                     }
-
-                    await _userDataDb.SaveQuestProgressAsync(id, normalizedName, status);
+                    
+                    changedItems.Add((id, normalizedName, status));
+                }
+                
+                if (changedItems.Count > 0)
+                {
+                    await _userDataDb.SaveQuestProgressBatchAsync(changedItems, profileType);
                 }
             }
             catch (Exception ex)
@@ -1175,19 +1193,20 @@ namespace TarkovHelper.Services
             });
         }
 
-        private void LoadProgress()
+        /// <summary>
+        /// Load progress asynchronously
+        /// </summary>
+        public async Task LoadProgressAsync(ProfileType? profileType = null)
         {
-            Task.Run(async () =>
-            {
-                await LoadProgressFromDbAsync();
-            }).GetAwaiter().GetResult();
+            await LoadProgressFromDbAsync(profileType);
         }
 
-        private async Task LoadProgressFromDbAsync()
+        private async Task LoadProgressFromDbAsync(ProfileType? profileType = null)
         {
             try
             {
-                var dbProgress = await _userDataDb.LoadQuestProgressAsync();
+                var actualProfileType = profileType ?? ProfileService.Instance.CurrentProfile;
+                var dbProgress = await _userDataDb.LoadQuestProgressAsync(actualProfileType);
 
                 _questProgress.Clear();
                 foreach (var kvp in dbProgress)

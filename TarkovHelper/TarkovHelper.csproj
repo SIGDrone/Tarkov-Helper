@@ -9,9 +9,12 @@
     <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
 
     <!-- Version Info for Auto-Update -->
-    <Version>1.0.1</Version>
-    <AssemblyVersion>1.0.1</AssemblyVersion>
-    <FileVersion>1.0.1</FileVersion>
+    <Version>1.1.37</Version>
+    <AssemblyVersion>1.1.37</AssemblyVersion>
+    <FileVersion>1.1.37</FileVersion>
+
+
+
     <ApplicationIcon>1764579946.ico</ApplicationIcon>
 
     <!-- AutoUpdater.NET 다국어 리소스 제한 (ko만 유지) -->
@@ -26,7 +29,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Resource Include="Fonts\Maplestory Light.ttf" />
+    <Content Include="Fonts\*.ttf;Fonts\*.otf" ExcludeFromSingleFile="true">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+
+
     <None Update="Assets\Maps\*.svg">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

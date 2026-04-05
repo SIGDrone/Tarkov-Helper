@@ -1051,7 +1051,7 @@ namespace TarkovHelper.Services
         [Obsolete("Use ApplyQuestChangesAsync for better performance")]
         public void ApplyQuestChanges(List<QuestChangeInfo> changes)
         {
-            Task.Run(async () => await ApplyQuestChangesAsync(changes)).GetAwaiter().GetResult();
+            _ = ApplyQuestChangesAsync(changes);
         }
 
         /// <summary>

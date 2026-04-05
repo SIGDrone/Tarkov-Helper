@@ -56,14 +56,14 @@
         <Style TargetType="Window">
             <Setter Property="Background" Value="{StaticResource BackgroundDarkBrush}"/>
             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
-            <Setter Property="FontFamily" Value="{StaticResource MaplestoryFont}"/>
+            <Setter Property="FontFamily" Value="{DynamicResource MaplestoryFont}"/>
             <Setter Property="FontSize" Value="{DynamicResource BaseFontSize}"/>
         </Style>
 
         <!-- TextBlock Style -->
         <Style TargetType="TextBlock">
             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
-            <Setter Property="FontFamily" Value="{StaticResource MaplestoryFont}"/>
+            <Setter Property="FontFamily" Value="{DynamicResource MaplestoryFont}"/>
             <Setter Property="FontSize" Value="{DynamicResource BaseFontSize}"/>
         </Style>
 
@@ -75,7 +75,7 @@
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="8,6"/>
             <Setter Property="CaretBrush" Value="{StaticResource TextPrimaryBrush}"/>
-            <Setter Property="FontFamily" Value="{StaticResource MaplestoryFont}"/>
+            <Setter Property="FontFamily" Value="{DynamicResource MaplestoryFont}"/>
             <Setter Property="FontSize" Value="{DynamicResource BaseFontSize}"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -104,7 +104,7 @@
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="12,8"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="FontFamily" Value="{StaticResource MaplestoryFont}"/>
+            <Setter Property="FontFamily" Value="{DynamicResource MaplestoryFont}"/>
             <Setter Property="FontSize" Value="{DynamicResource BaseFontSize}"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -139,7 +139,7 @@
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="4,0,0,0"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="FontFamily" Value="{StaticResource MaplestoryFont}"/>
+            <Setter Property="FontFamily" Value="{DynamicResource MaplestoryFont}"/>
             <Setter Property="FontSize" Value="{DynamicResource BaseFontSize}"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Template">
@@ -249,7 +249,7 @@
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="8,6"/>
             <Setter Property="MinHeight" Value="30"/>
-            <Setter Property="FontFamily" Value="{StaticResource MaplestoryFont}"/>
+            <Setter Property="FontFamily" Value="{DynamicResource MaplestoryFont}"/>
             <Setter Property="FontSize" Value="{DynamicResource BaseFontSize}"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -300,7 +300,7 @@
             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
             <Setter Property="Padding" Value="10,6"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="FontFamily" Value="{StaticResource MaplestoryFont}"/>
+            <Setter Property="FontFamily" Value="{DynamicResource MaplestoryFont}"/>
             <Setter Property="FontSize" Value="{DynamicResource BaseFontSize}"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -493,7 +493,7 @@
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="FontSize" Value="{DynamicResource BaseFontSize}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="FontFamily" Value="{StaticResource MaplestoryFont}"/>
+            <Setter Property="FontFamily" Value="{DynamicResource MaplestoryFont}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
@@ -522,7 +522,7 @@
         <Style TargetType="Menu">
             <Setter Property="Background" Value="{StaticResource BackgroundMediumBrush}"/>
             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
-            <Setter Property="FontFamily" Value="{StaticResource MaplestoryFont}"/>
+            <Setter Property="FontFamily" Value="{DynamicResource MaplestoryFont}"/>
             <Setter Property="FontSize" Value="{DynamicResource BaseFontSize}"/>
         </Style>
 
@@ -530,7 +530,7 @@
         <Style TargetType="MenuItem">
             <Setter Property="Background" Value="{StaticResource BackgroundMediumBrush}"/>
             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
-            <Setter Property="FontFamily" Value="{StaticResource MaplestoryFont}"/>
+            <Setter Property="FontFamily" Value="{DynamicResource MaplestoryFont}"/>
             <Setter Property="FontSize" Value="{DynamicResource BaseFontSize}"/>
             <Setter Property="Padding" Value="8,4"/>
             <Setter Property="Template">

@@ -139,7 +139,7 @@ public class MapMarkersManager
 
     #region Public Methods - Marker Management
 
-    public void RefreshMarkers()
+    public async Task RefreshMarkersAsync(CancellationToken ct = default)
     {
         if (string.IsNullOrEmpty(_currentMapKey)) return;
         if (!_markerDbService.IsLoaded) return;
@@ -154,8 +154,15 @@ public class MapMarkersManager
         // 현재 맵의 마커 가져오기
         var markers = _markerDbService.GetMarkersForMap(_currentMapKey);
 
+        int count = 0;
         foreach (var marker in markers)
         {
+            // [v1.1.37] UI 부하 분산
+            count++;
+            if (count % 30 == 0) await Task.Yield();
+
+            ct.ThrowIfCancellationRequested();
+
             // 마커 타입별 가시성 확인
             if (!ShouldShowMarker(marker.Type)) continue;
 

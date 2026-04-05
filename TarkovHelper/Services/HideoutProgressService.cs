@@ -13,6 +13,15 @@ namespace TarkovHelper.Services
         private static HideoutProgressService? _instance;
         public static HideoutProgressService Instance => _instance ??= new HideoutProgressService();
 
+        /// <summary>
+        /// 싱글톤 인스턴스를 파괴하여 은신처 진행 데이터를 초기화합니다.
+        /// </summary>
+        public static void ResetInstance()
+        {
+            _instance = null;
+        }
+        private ProfileType _loadedProfile = ProfileType.Pvp;
+
         private readonly UserDataDbService _userDataDb = UserDataDbService.Instance;
 
         // Currency items should count by reference count, not total amount
@@ -30,11 +39,12 @@ namespace TarkovHelper.Services
         public event EventHandler? ProgressChanged;
 
         /// <summary>
-        /// Initialize service with hideout module data
+        /// Initialize service with hideout module data (Asynchronous)
         /// </summary>
-        public void Initialize(List<HideoutModule> modules)
+        public async Task InitializeAsync(List<HideoutModule> modules)
         {
             _allModules = modules;
+            _loadedProfile = ProfileService.Instance.CurrentProfile;
 
             // Build dictionary by normalized name
             _modulesByNormalizedName = new Dictionary<string, HideoutModule>(StringComparer.OrdinalIgnoreCase);
@@ -46,7 +56,21 @@ namespace TarkovHelper.Services
                 }
             }
 
-            LoadProgress();
+            await LoadProgressAsync();
+        }
+
+        public void Initialize(List<HideoutModule> modules)
+        {
+            _allModules = modules;
+            _modulesByNormalizedName = new Dictionary<string, HideoutModule>(StringComparer.OrdinalIgnoreCase);
+            foreach (var module in modules.Where(m => !string.IsNullOrEmpty(m.NormalizedName)))
+            {
+                if (!_modulesByNormalizedName.ContainsKey(module.NormalizedName))
+                {
+                    _modulesByNormalizedName[module.NormalizedName] = module;
+                }
+            }
+            _ = LoadProgressFromDbAsync();
         }
 
         /// <summary>
@@ -108,17 +132,17 @@ namespace TarkovHelper.Services
 
         private void SaveSingleModule(string normalizedName, int level)
         {
-            Task.Run(async () =>
+            _ = Task.Run(async () =>
             {
                 try
                 {
-                    await _userDataDb.SaveHideoutProgressAsync(normalizedName, level);
+                    await _userDataDb.SaveHideoutProgressAsync(normalizedName, level, _loadedProfile);
                 }
                 catch (Exception ex)
                 {
                     _log.Error($"Save failed: {ex.Message}");
                 }
-            }).GetAwaiter().GetResult();
+            });
         }
 
         /// <summary>
@@ -292,26 +316,27 @@ namespace TarkovHelper.Services
         public void ResetAllProgress()
         {
             _progress = new HideoutProgress();
-            Task.Run(async () =>
+            _ = Task.Run(async () =>
             {
                 try
                 {
-                    await _userDataDb.ClearAllHideoutProgressAsync();
+                    await _userDataDb.ClearAllHideoutProgressAsync(_loadedProfile);
                 }
                 catch (Exception ex)
                 {
                     _log.Error($"Reset failed: {ex.Message}");
                 }
-            }).GetAwaiter().GetResult();
+            });
             ProgressChanged?.Invoke(this, EventArgs.Empty);
         }
 
         /// <summary>
         /// 강제로 진행도를 다시 로드 (프로필 전환 시 사용)
         /// </summary>
-        public void ReloadProgress()
+        public async Task ReloadProgressAsync()
         {
-            LoadProgress();
+            _loadedProfile = ProfileService.Instance.CurrentProfile;
+            await LoadProgressFromDbAsync();
             ProgressChanged?.Invoke(this, EventArgs.Empty);
         }
 
@@ -319,8 +344,7 @@ namespace TarkovHelper.Services
 
         private void SaveProgress()
         {
-            // DB에 저장 (Task.Run으로 데드락 방지)
-            Task.Run(async () => await SaveProgressToDbAsync()).GetAwaiter().GetResult();
+            _ = SaveProgressToDbAsync();
         }
 
         private async Task SaveProgressToDbAsync()
@@ -329,7 +353,7 @@ namespace TarkovHelper.Services
             {
                 foreach (var kvp in _progress.Modules)
                 {
-                    await _userDataDb.SaveHideoutProgressAsync(kvp.Key, kvp.Value);
+                    await _userDataDb.SaveHideoutProgressAsync(kvp.Key, kvp.Value, _loadedProfile);
                 }
             }
             catch (Exception ex)
@@ -338,21 +362,21 @@ namespace TarkovHelper.Services
             }
         }
 
+        public async Task LoadProgressAsync()
+        {
+            await LoadProgressFromDbAsync();
+        }
+
         private void LoadProgress()
         {
-            // Task.Run으로 데드락 방지
-            // 마이그레이션은 MainWindow에서 먼저 수행됨
-            Task.Run(async () =>
-            {
-                await LoadProgressFromDbAsync();
-            }).GetAwaiter().GetResult();
+            _ = LoadProgressFromDbAsync();
         }
 
         private async Task LoadProgressFromDbAsync()
         {
             try
             {
-                var modules = await _userDataDb.LoadHideoutProgressAsync();
+                var modules = await _userDataDb.LoadHideoutProgressAsync(_loadedProfile);
                 _progress = new HideoutProgress
                 {
                     Modules = new Dictionary<string, int>(modules, StringComparer.OrdinalIgnoreCase),

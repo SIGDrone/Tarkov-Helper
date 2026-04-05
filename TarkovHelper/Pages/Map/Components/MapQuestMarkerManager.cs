@@ -124,7 +124,7 @@ public class MapQuestMarkerManager
 
     #region Public Methods - Marker Management
 
-    public void RefreshMarkers()
+    public async Task RefreshMarkersAsync(CancellationToken ct = default)
     {
         if (string.IsNullOrEmpty(_currentMapKey)) return;
         if (!_objectiveService.IsLoaded) return;
@@ -165,8 +165,14 @@ public class MapQuestMarkerManager
 
         StatusUpdated?.Invoke($"Found {_currentMapObjectives.Count} active objectives for {_currentMapKey}");
 
+        int count = 0;
         foreach (var objective in _currentMapObjectives)
         {
+            // [v1.1.37] UI 프리징 방지를 위해 20개마다 틈을 줌
+            count++;
+            if (count % 20 == 0)
+                await Task.Yield();
+
             // ObjectiveId 기반으로 완료 상태 확인 (동일 설명 목표 개별 추적)
             var isCompleted = ObjectiveProgressService.Instance.IsObjectiveCompletedById(objective.ObjectiveId);
             objective.IsCompleted = isCompleted;
@@ -223,7 +229,13 @@ public class MapQuestMarkerManager
         if (showName)
         {
             // 레이아웃 완료 후 그룹화 수행 (Measure가 정확한 크기를 반환하도록)
-            Application.Current.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, DetectAndGroupOverlappingMarkers);
+            // [v1.1.37] 마커 생성이 완전히 끝날 때까지 약간 대기
+            _ = Task.Delay(100).ContinueWith(_ => {
+                Application.Current.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() =>
+                {
+                    DetectAndGroupOverlappingMarkers();
+                }));
+            });
         }
     }
 

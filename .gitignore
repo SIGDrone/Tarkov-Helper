@@ -145,3 +145,4 @@ logs/
 *.log
 BuildOutput/
 Build_Final/
+release_v*/

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -15,8 +15,13 @@ namespace TarkovHelper.Debug
         public static bool IsDebugMode { get; set; } = false;
         #endif
 
-        public static string DataPath { get; set; } = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"Data");
-        public static string CachePath { get; set; } = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Cache");
-        public static string ConfigPath { get; set; } = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Config");
+        private static readonly string AppDataHelperPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "TarkovHelper"
+        );
+
+        public static string DataPath { get; set; } = Path.Combine(AppDataHelperPath, "Data");
+        public static string CachePath { get; set; } = Path.Combine(AppDataHelperPath, "Cache");
+        public static string ConfigPath { get; set; } = Path.Combine(AppDataHelperPath, "Config");
     }
 }

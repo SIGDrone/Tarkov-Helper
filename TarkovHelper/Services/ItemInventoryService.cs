@@ -13,6 +13,15 @@ namespace TarkovHelper.Services
         private static ItemInventoryService? _instance;
         public static ItemInventoryService Instance => _instance ??= new ItemInventoryService();
 
+        /// <summary>
+        /// 싱글톤 인스턴스를 파괴하여 캐시된 인벤토리 데이터를 완전히 비웁니다.
+        /// </summary>
+        public static void ResetInstance()
+        {
+            _instance = null;
+        }
+        private ProfileType _loadedProfile = ProfileType.Pvp;
+
         private readonly UserDataDbService _userDataDb = UserDataDbService.Instance;
 
         private ItemInventoryData _inventoryData = new();
@@ -26,7 +35,7 @@ namespace TarkovHelper.Services
 
         private ItemInventoryService()
         {
-            LoadInventory();
+            // 초기화는 외부에서 비동기적으로 호출되어야 합니다.
             InitializeSaveTimer();
         }
 
@@ -50,7 +59,7 @@ namespace TarkovHelper.Services
                 _pendingSaves.Clear();
             }
 
-            Task.Run(async () =>
+            _ = Task.Run(async () =>
             {
                 foreach (var itemName in itemsToSave)
                 {
@@ -70,14 +79,14 @@ namespace TarkovHelper.Services
                                 nonFirQty = 0;
                             }
                         }
-                        await _userDataDb.SaveItemInventoryAsync(itemName, firQty, nonFirQty);
+                        await _userDataDb.SaveItemInventoryAsync(itemName, firQty, nonFirQty, _loadedProfile);
                     }
                     catch (Exception ex)
                     {
                         _log.Error($"Save failed for {itemName}: {ex.Message}");
                     }
                 }
-            }).GetAwaiter().GetResult();
+            });
         }
 
         /// <summary>
@@ -253,17 +262,17 @@ namespace TarkovHelper.Services
                 _inventoryData = new ItemInventoryData();
             }
 
-            Task.Run(async () =>
+            _ = Task.Run(async () =>
             {
                 try
                 {
-                    await _userDataDb.ClearAllItemInventoryAsync();
+                    await _userDataDb.ClearAllItemInventoryAsync(_loadedProfile);
                 }
                 catch (Exception ex)
                 {
                     _log.Error($"Reset failed: {ex.Message}");
                 }
-            }).GetAwaiter().GetResult();
+            });
 
             InventoryChanged?.Invoke(this, EventArgs.Empty);
         }
@@ -271,9 +280,9 @@ namespace TarkovHelper.Services
         /// <summary>
         /// 강제로 인벤토리를 다시 로드 (프로필 전환 시 사용)
         /// </summary>
-        public void ReloadInventory()
+        public async Task ReloadInventoryAsync()
         {
-            LoadInventory();
+            await LoadInventoryFromDbAsync();
             InventoryChanged?.Invoke(this, EventArgs.Empty);
         }
 
@@ -290,21 +299,27 @@ namespace TarkovHelper.Services
             _saveTimer?.Start();
         }
 
+        public async Task InitializeAsync()
+        {
+            _loadedProfile = ProfileService.Instance.CurrentProfile;
+            await LoadInventoryFromDbAsync();
+        }
+
+        public async Task LoadInventoryAsync()
+        {
+            await LoadInventoryFromDbAsync();
+        }
+
         private void LoadInventory()
         {
-            // Task.Run으로 데드락 방지
-            // 마이그레이션은 MainWindow에서 먼저 수행됨
-            Task.Run(async () =>
-            {
-                await LoadInventoryFromDbAsync();
-            }).GetAwaiter().GetResult();
+            _ = LoadInventoryFromDbAsync();
         }
 
         private async Task LoadInventoryFromDbAsync()
         {
             try
             {
-                var items = await _userDataDb.LoadItemInventoryAsync();
+                var items = await _userDataDb.LoadItemInventoryAsync(_loadedProfile);
                 var newData = new ItemInventoryData
                 {
                     LastUpdated = DateTime.UtcNow,

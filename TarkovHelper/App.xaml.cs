@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Reflection;
 using System.Windows;
 using AutoUpdaterDotNET;
@@ -25,6 +25,9 @@ namespace TarkovHelper
 
         protected override void OnStartup(StartupEventArgs e)
         {
+            // DB 초기화를 가장 먼저 수행 (SettingsService, ProfileService 등이 안전하게 접근할 수 있도록 보장)
+            UserDataDbService.Instance.EnsureInitialized();
+
             base.OnStartup(e);
 
             // 전역 예외 처리 - 에러 로그 파일에 기록

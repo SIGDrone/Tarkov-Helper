@@ -108,6 +108,7 @@ public partial class MapPage : UserControl
     private MapMarkersManager? _mapMarkersManager;
     private MapCustomMarkerManager? _customMarkerManager;
     private Point _lastRightClickPosition;
+    private CancellationTokenSource? _loadingCts;
 
     public MapPage()
     {
@@ -222,15 +223,30 @@ public partial class MapPage : UserControl
         _calibrationController?.SetupMarkerForCalibration(marker, extract);
     }
 
-    private void OnCalibrationCompleted(object? sender, EventArgs e)
+    private async void OnCalibrationCompleted(object? sender, EventArgs e)
     {
-        RefreshExtractMarkers();
+        try
+        {
+            var ct = GetNewCancellationToken();
+            await RefreshExtractMarkers(ct);
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private CancellationToken GetNewCancellationToken()
+    {
+        _loadingCts?.Cancel();
+        _loadingCts?.Dispose();
+        _loadingCts = new CancellationTokenSource();
+        return _loadingCts.Token;
     }
 
     private async void MapTrackerPage_Loaded(object sender, RoutedEventArgs e)
     {
         try
         {
+            var ct = GetNewCancellationToken();
+
             // 페이지 로드 시 Trail 초기화
             _trackerService?.ClearTrail();
             TrailPath.Points.Clear();
@@ -251,16 +267,20 @@ public partial class MapPage : UserControl
             UpdateUI();
 
             // 퀘스트 목표 데이터 로드
-            await LoadQuestObjectivesAsync();
+            await Task.Yield();
+            await LoadQuestObjectivesAsync(ct);
 
             // 탈출구 데이터 로드
-            await LoadExtractsAsync();
+            await Task.Yield();
+            await LoadExtractsAsync(ct);
 
             // Map Markers 데이터 로드
-            await LoadMapMarkersAsync();
+            await Task.Yield();
+            await LoadMapMarkersAsync(ct);
 
             // 층 감지 데이터 로드 (자동 층 전환용)
-            await FloorDetectionService.Instance.LoadFloorRangesAsync();
+            await Task.Yield();
+            await FloorDetectionService.Instance.LoadFloorRangesAsync().WaitAsync(ct);
 
             // Drawer 기본 열기 및 내용 새로고침
             OpenQuestDrawer();
@@ -274,7 +294,7 @@ public partial class MapPage : UserControl
             GlobalKeyboardHookService.Instance.IsEnabled = true;
 
             // 오버레이 미니맵 서비스 초기화
-            await InitializeOverlayServiceAsync();
+            await InitializeOverlayServiceAsync().WaitAsync(ct);
 
             // 자동 Tracking 시작 (Map 탭 활성화 시)
             StartAutoTracking();
@@ -287,6 +307,9 @@ public partial class MapPage : UserControl
 
     private void MapTrackerPage_Unloaded(object sender, RoutedEventArgs e)
     {
+        // 로딩 작업 취소
+        _loadingCts?.Cancel();
+
         // 현재 맵 상태 저장
         SaveMapState();
 
@@ -324,17 +347,19 @@ public partial class MapPage : UserControl
     private async void OnDatabaseRefreshed(object? sender, EventArgs e)
     {
         // DB 업데이트 후 마커 데이터 다시 로드
-        await Dispatcher.InvokeAsync(async () =>
+        try
         {
+            var ct = GetNewCancellationToken();
             // 퀘스트 목표 데이터 다시 로드
-            await LoadQuestObjectivesAsync();
+            await LoadQuestObjectivesAsync(ct);
 
             // 탈출구 데이터 다시 로드
-            await LoadExtractsAsync();
+            await LoadExtractsAsync(ct);
 
             // 퀘스트 마커 갱신
-            RefreshQuestMarkers();
-        });
+            await RefreshQuestMarkers(ct);
+        }
+        catch (OperationCanceledException) { }
     }
 
     private void RestoreMapState()
@@ -1072,51 +1097,66 @@ public partial class MapPage : UserControl
         }
     }
 
-    private void CmbMapSelect_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private async void CmbMapSelect_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (CmbMapSelect.SelectedItem is ComboBoxItem item && item.Tag is string mapKey)
         {
-            _currentMapKey = mapKey;
-            _trackerService?.SetCurrentMap(mapKey);
-
-            // 맵 변경 시 Trail 초기화
-            _trackerService?.ClearTrail();
-            TrailPath.Points.Clear();
-            PlayerMarker.Visibility = Visibility.Collapsed;
-            PlayerDot.Visibility = Visibility.Collapsed;
-
-            // 층 콤보박스 업데이트
-            UpdateFloorComboBox(mapKey);
-
-            LoadMapImage(mapKey);
-            LoadCurrentMapSettings();
-
-            // 맵별 마커 스케일 적용 (플레이어 마커 크기 업데이트)
-            var playerMarkerSize = _trackerService?.Settings.PlayerMarkerSize ?? 16;
-            UpdatePlayerMarkerSize(playerMarkerSize);
-
-            // 초기화 완료 후에만 호출
-            if (_objectiveService.IsLoaded)
+            try
             {
-                RefreshQuestMarkers();
+                var ct = GetNewCancellationToken();
+                _currentMapKey = mapKey;
+                _trackerService?.SetCurrentMap(mapKey);
+
+                // 맵 변경 시 Trail 초기화
+                _trackerService?.ClearTrail();
+                TrailPath.Points.Clear();
+                PlayerMarker.Visibility = Visibility.Collapsed;
+                PlayerDot.Visibility = Visibility.Collapsed;
+
+                // 층 콤보박스 업데이트
+                UpdateFloorComboBox(mapKey);
+
+                await LoadMapImageAsync(mapKey, true, ct);
+                LoadCurrentMapSettings();
+
+                // 맵별 마커 스케일 적용 (플레이어 마커 크기 업데이트)
+                var playerMarkerSize = _trackerService?.Settings.PlayerMarkerSize ?? 16;
+                UpdatePlayerMarkerSize(playerMarkerSize);
+
+                // 초기화 완료 후에만 호출
+                if (_objectiveService.IsLoaded)
+                {
+                    await RefreshQuestMarkers(ct);
+                }
+                if (_extractService.IsLoaded)
+                {
+                    await RefreshExtractMarkers(ct);
+                }
+                if (MapMarkerDbService.Instance.IsLoaded)
+                {
+                    await RefreshMapMarkers(ct);
+                }
+
+                // 커스텀 마커 새로고침
+                UpdateCustomMarkersParam();
+                if (_customMarkerManager != null)
+                {
+                    await _customMarkerManager.RefreshMarkersAsync(ct);
+                }
+
+                // 패널이 열려있으면 내용 갱신 (닫지 않음)
+                if (QuestDrawerPanel?.Visibility == Visibility.Visible)
+                {
+                    RefreshQuestDrawer();
+                }
             }
-            if (_extractService.IsLoaded)
+            catch (OperationCanceledException)
             {
-                RefreshExtractMarkers();
+                _log.Info("CmbMapSelect_SelectionChanged cancelled");
             }
-            if (MapMarkerDbService.Instance.IsLoaded)
+            catch (Exception ex)
             {
-                RefreshMapMarkers();
-            }
-
-            // 커스텀 마커 새로고침
-            UpdateCustomMarkersParam();
-            _ = _customMarkerManager?.RefreshMarkersAsync();
-
-            // 패널이 열려있으면 내용 갱신 (닫지 않음)
-            if (QuestDrawerPanel?.Visibility == Visibility.Visible)
-            {
-                RefreshQuestDrawer();
+                _log.Error("Error in CmbMapSelect_SelectionChanged", ex);
             }
         }
     }
@@ -1139,25 +1179,37 @@ public partial class MapPage : UserControl
         CmbFloorSelect.SelectedIndex = floorIndex;
     }
 
-    private void CmbFloorSelect_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private async void CmbFloorSelect_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (CmbFloorSelect.SelectedItem is ComboBoxItem floorItem && floorItem.Tag is string floorId)
         {
             if (_currentFloorId != floorId)
             {
-                _currentFloorId = floorId;
-
-                // 층이 변경되면 맵 이미지 다시 로드 (화면 위치는 유지)
-                if (!string.IsNullOrEmpty(_currentMapKey))
+                try
                 {
-                    LoadMapImage(_currentMapKey, centerView: false);
+                    var ct = GetNewCancellationToken();
+                    _currentFloorId = floorId;
 
-                    // 마커들도 새로고침 (층 정보에 따른 표시 업데이트)
-                    RefreshExtractMarkers();
-                    RefreshQuestMarkers();
-                    RefreshMapMarkers();
-                    UpdateCustomMarkersParam();
-                    _customMarkerManager?.UpdateMarkerDisplay();
+                    // 층이 변경되면 맵 이미지 다시 로드 (화면 위치는 유지)
+                    if (!string.IsNullOrEmpty(_currentMapKey))
+                    {
+                        await LoadMapImageAsync(_currentMapKey, centerView: false, ct);
+
+                        // 마커들도 새로고침 (층 정보에 따른 표시 업데이트)
+                        await RefreshExtractMarkers(ct);
+                        await RefreshQuestMarkers(ct);
+                        await RefreshMapMarkers(ct);
+                        UpdateCustomMarkersParam();
+                        _customMarkerManager?.UpdateMarkerDisplay();
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    _log.Info("CmbFloorSelect_SelectionChanged cancelled");
+                }
+                catch (Exception ex)
+                {
+                    _log.Error("Error in CmbFloorSelect_SelectionChanged", ex);
                 }
             }
         }
@@ -1504,8 +1556,9 @@ public partial class MapPage : UserControl
 
     #region 맵/마커 관련 메서드
 
-    private void LoadMapImage(string mapKey, bool centerView = true)
+    private async Task LoadMapImageAsync(string mapKey, bool centerView = true, CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
         var config = _trackerService?.GetMapConfig(mapKey);
         if (config == null)
         {
@@ -1570,14 +1623,20 @@ public partial class MapPage : UserControl
                     }
                 }
 
-                // 층 필터링이 필요한 경우 SVG 전처리 후 임시 파일로 로드
+                // [v1.1.36] 층 필터링 및 SVG 전처리를 백그라운드 스레드에서 수행 (프리징 방지)
                 if (visibleFloors != null)
                 {
-                    var preprocessor = new SvgStylePreprocessor();
-                    var processedSvg = preprocessor.ProcessSvgFile(imagePath, visibleFloors, allFloors, backgroundFloorId, backgroundOpacity);
+                    string tempPath = await Task.Run(() =>
+                    {
+                        var preprocessor = new SvgStylePreprocessor();
+                        var processedSvg = preprocessor.ProcessSvgFile(imagePath, visibleFloors, allFloors, backgroundFloorId, backgroundOpacity);
 
-                    var tempPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"legacy_map_{Guid.NewGuid()}.svg");
-                    File.WriteAllText(tempPath, processedSvg);
+                        var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"legacy_map_{Guid.NewGuid()}.svg");
+                        File.WriteAllText(path, processedSvg);
+                        return path;
+                    }, ct);
+
+                    ct.ThrowIfCancellationRequested();
                     MapSvg.Source = new Uri(tempPath, UriKind.Absolute);
                 }
                 else
@@ -1755,7 +1814,7 @@ public partial class MapPage : UserControl
         TxtLastUpdateTime.Text = DateTime.Now.ToString("HH:mm:ss");
     }
 
-    private void UpdateMarkerSize(int size)
+    private async void UpdateMarkerSize(int size)
     {
         // 퀘스트 마커 크기 설정 저장
         if (_trackerService != null)
@@ -1763,7 +1822,12 @@ public partial class MapPage : UserControl
             _trackerService.Settings.MarkerSize = size;
             _trackerService.SaveSettings();
             // 퀘스트 마커 새로고침
-            RefreshQuestMarkers();
+            try
+            {
+                var ct = GetNewCancellationToken();
+                await RefreshQuestMarkers(ct);
+            }
+            catch (OperationCanceledException) { }
         }
     }
 
@@ -2004,24 +2068,29 @@ public partial class MapPage : UserControl
 
     #region 퀘스트 목표 마커
 
-    private async Task LoadQuestObjectivesAsync()
+    private async Task LoadQuestObjectivesAsync(CancellationToken ct = default)
     {
         try
         {
+            ct.ThrowIfCancellationRequested();
             TxtStatus.Text = "Loading quest objectives...";
 
             await _objectiveService.EnsureLoadedAsync(msg =>
             {
                 Dispatcher.Invoke(() => TxtStatus.Text = msg);
-            });
+            }).WaitAsync(ct);
 
             var count = _objectiveService.AllObjectives.Count;
             TxtStatus.Text = $"Loaded {count} quest objectives";
 
             if (!string.IsNullOrEmpty(_currentMapKey))
             {
-                RefreshQuestMarkers();
+                await RefreshQuestMarkers(ct);
             }
+        }
+        catch (OperationCanceledException)
+        {
+            // 중단됨
         }
         catch (Exception ex)
         {
@@ -2029,14 +2098,24 @@ public partial class MapPage : UserControl
         }
     }
 
-    private void OnQuestProgressChanged(object? sender, EventArgs e)
+    private async void OnQuestProgressChanged(object? sender, EventArgs e)
     {
-        Dispatcher.Invoke(RefreshQuestMarkers);
+        try
+        {
+            var ct = GetNewCancellationToken();
+            await RefreshQuestMarkers(ct);
+        }
+        catch (OperationCanceledException) { }
     }
 
-    private void OnObjectiveProgressChanged(object? sender, ObjectiveProgressChangedEventArgs e)
+    private async void OnObjectiveProgressChanged(object? sender, ObjectiveProgressChangedEventArgs e)
     {
-        Dispatcher.Invoke(RefreshQuestMarkers);
+        try
+        {
+            var ct = GetNewCancellationToken();
+            await RefreshQuestMarkers(ct);
+        }
+        catch (OperationCanceledException) { }
     }
 
     private void ChkShowQuestMarkers_Changed(object sender, RoutedEventArgs e)
@@ -2086,7 +2165,7 @@ public partial class MapPage : UserControl
         return false;
     }
 
-    private void RefreshQuestMarkers()
+    private async Task RefreshQuestMarkers(CancellationToken ct = default)
     {
         // 컴포넌트를 사용하여 마커 새로고침
         if (_questMarkerManager == null) return;
@@ -2101,7 +2180,7 @@ public partial class MapPage : UserControl
         _questMarkerManager.SetHideCompletedObjectives(_hideCompletedObjectives);
 
         // 마커 새로고침
-        _questMarkerManager.RefreshMarkers();
+        await _questMarkerManager.RefreshMarkersAsync(ct);
 
         // 컴포넌트에서 계산된 현재 맵 목표를 동기화 (Drawer 표시용)
         _currentMapObjectives = _questMarkerManager.GetCurrentMapObjectives();
@@ -2401,24 +2480,29 @@ public partial class MapPage : UserControl
 
     #region 탈출구 마커
 
-    private async Task LoadExtractsAsync()
+    private async Task LoadExtractsAsync(CancellationToken ct = default)
     {
         try
         {
+            ct.ThrowIfCancellationRequested();
             TxtStatus.Text = "탈출구 데이터를 불러오는 중...";
 
             await _extractService.EnsureLoadedAsync(msg =>
             {
                 Dispatcher.Invoke(() => TxtStatus.Text = msg);
-            });
+            }).WaitAsync(ct);
 
             var count = _extractService.AllExtracts.Count;
             TxtStatus.Text = $"{count}개의 탈출구 데이터를 불러왔습니다";
 
             if (!string.IsNullOrEmpty(_currentMapKey))
             {
-                RefreshExtractMarkers();
+                await RefreshExtractMarkers(ct);
             }
+        }
+        catch (OperationCanceledException)
+        {
+            // 중단됨
         }
         catch (Exception ex)
         {
@@ -2426,7 +2510,7 @@ public partial class MapPage : UserControl
         }
     }
 
-    private void RefreshExtractMarkers()
+    private async Task RefreshExtractMarkers(CancellationToken ct = default)
     {
         // 컴포넌트를 사용하여 마커 새로고침
         if (_extractMarkerManager == null) return;
@@ -2435,6 +2519,7 @@ public partial class MapPage : UserControl
         _extractMarkerManager.SetCurrentMap(_currentMapKey);
         _extractMarkerManager.SetCurrentFloor(_currentFloorId);
         _extractMarkerManager.SetZoomLevel(_zoomLevel);
+
         _extractMarkerManager.SetShowExtractMarkers(_showExtractMarkers);
         _extractMarkerManager.SetShowPmcExtracts(_showPmcExtracts);
         _extractMarkerManager.SetShowScavExtracts(_showScavExtracts);
@@ -2442,28 +2527,33 @@ public partial class MapPage : UserControl
         _extractMarkerManager.SetExtractNameTextSize(_extractNameTextSize);
 
         // 마커 새로고침
-        _extractMarkerManager.RefreshMarkers();
+        await _extractMarkerManager.RefreshMarkersAsync(ct);
     }
 
     #endregion
 
     #region Map Markers (PMC Spawn, Sniper Scav, Rogue, Cultist, Boss, Lever)
 
-    private async Task LoadMapMarkersAsync()
+    private async Task LoadMapMarkersAsync(CancellationToken ct = default)
     {
         try
         {
+            ct.ThrowIfCancellationRequested();
             TxtStatus.Text = "지도 마커 데이터를 불러오는 중...";
 
-            await MapMarkerDbService.Instance.LoadMarkersAsync();
+            await MapMarkerDbService.Instance.LoadMarkersAsync().WaitAsync(ct);
 
             var count = MapMarkerDbService.Instance.MarkerCount;
             TxtStatus.Text = $"{count}개의 지도 마커 데이터를 불러왔습니다";
 
             if (!string.IsNullOrEmpty(_currentMapKey))
             {
-                RefreshMapMarkers();
+                await RefreshMapMarkers(ct);
             }
+        }
+        catch (OperationCanceledException)
+        {
+            // 중단됨
         }
         catch (Exception ex)
         {
@@ -2636,7 +2726,7 @@ public partial class MapPage : UserControl
 
     #region Calibration Mode
 
-    private void SaveCalibrationAndRefresh()
+    private async void SaveCalibrationAndRefresh()
     {
         if (_trackerService == null) return;
 
@@ -2654,8 +2744,8 @@ public partial class MapPage : UserControl
                 _trackerService.SaveSettings();
 
                 // 마커 새로고침
-                RefreshExtractMarkers();
-                RefreshQuestMarkers();
+                await RefreshExtractMarkers();
+                await RefreshQuestMarkers();
             }
             else
             {
@@ -2755,7 +2845,7 @@ public partial class MapPage : UserControl
 
     #endregion
 
-    private void ChkShowExtractMarkers_Changed(object sender, RoutedEventArgs e)
+    private async void ChkShowExtractMarkers_Changed(object sender, RoutedEventArgs e)
     {
         _showExtractMarkers = ChkShowExtractMarkers?.IsChecked ?? true;
         if (ExtractMarkersContainer != null)
@@ -2770,26 +2860,33 @@ public partial class MapPage : UserControl
         OverlayMiniMapService.Instance.RefreshMap();
     }
 
-    private void ChkExtractFilter_Changed(object sender, RoutedEventArgs e)
+    private async void ChkExtractFilter_Changed(object sender, RoutedEventArgs e)
     {
-        _showPmcExtracts = ChkShowPmcExtracts?.IsChecked ?? true;
-        _showScavExtracts = ChkShowScavExtracts?.IsChecked ?? true;
-        _showTransitExtracts = ChkShowTransitExtracts?.IsChecked ?? true;
+        if (!IsLoaded) return;
 
-        // DB에 저장
-        var settingsService = SettingsService.Instance;
-        settingsService.MapShowPmcExtracts = _showPmcExtracts;
-        settingsService.MapShowScavExtracts = _showScavExtracts;
-        settingsService.MapShowTransits = _showTransitExtracts;
+        try
+        {
+            var ct = GetNewCancellationToken();
+            _showPmcExtracts = ChkShowPmcExtracts?.IsChecked ?? true;
+            _showScavExtracts = ChkShowScavExtracts?.IsChecked ?? true;
+            _showTransitExtracts = ChkShowTransitExtracts?.IsChecked ?? true;
 
-        // 마커 새로고침
-        RefreshExtractMarkers();
+            // DB에 저장
+            var settingsService = SettingsService.Instance;
+            settingsService.MapShowPmcExtracts = _showPmcExtracts;
+            settingsService.MapShowScavExtracts = _showScavExtracts;
+            settingsService.MapShowTransits = _showTransitExtracts;
 
-        // 오버레이 맵도 새로고침
-        OverlayMiniMapService.Instance.RefreshMap();
+            // 마커 새로고침
+            await RefreshExtractMarkers(ct);
+
+            // 오버레이 맵도 새로고침
+            OverlayMiniMapService.Instance.RefreshMap();
+        }
+        catch (OperationCanceledException) { }
     }
 
-    private void SliderExtractTextSize_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    private async void SliderExtractTextSize_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (TxtExtractTextSize != null)
         {
@@ -2802,12 +2899,17 @@ public partial class MapPage : UserControl
             // 마커 새로고침
             if (_extractService.IsLoaded)
             {
-                RefreshExtractMarkers();
+                try
+                {
+                    var ct = GetNewCancellationToken();
+                    await RefreshExtractMarkers(ct);
+                }
+                catch (OperationCanceledException) { }
             }
         }
     }
 
-    private void MarkerColor_Click(object sender, MouseButtonEventArgs e)
+    private async void MarkerColor_Click(object sender, MouseButtonEventArgs e)
     {
         if (sender is Border border && border.Tag is string objectiveType)
         {
@@ -2836,13 +2938,18 @@ public partial class MapPage : UserControl
                     _trackerService.SaveSettings();
 
                     // 마커 새로고침
-                    RefreshQuestMarkers();
+                    try
+                    {
+                        var ct = GetNewCancellationToken();
+                        await RefreshQuestMarkers(ct);
+                    }
+                    catch (OperationCanceledException) { }
                 }
             }
         }
     }
 
-    private void BtnResetColors_Click(object sender, RoutedEventArgs e)
+    private async void BtnResetColors_Click(object sender, RoutedEventArgs e)
     {
         // 기본 색상으로 복원
         var defaultColors = new Dictionary<string, string>
@@ -2864,7 +2971,12 @@ public partial class MapPage : UserControl
         UpdateMarkerColorUI();
 
         // 마커 새로고침
-        RefreshQuestMarkers();
+        try
+        {
+            var ct = GetNewCancellationToken();
+            await RefreshQuestMarkers(ct);
+        }
+        catch (OperationCanceledException) { }
     }
 
     private void UpdateMarkerColorUI()
@@ -2888,7 +3000,7 @@ public partial class MapPage : UserControl
 
     #region 퀘스트 목표 체크박스 이벤트
 
-    private void ObjectiveCheckBox_Checked(object sender, RoutedEventArgs e)
+    private async void ObjectiveCheckBox_Checked(object sender, RoutedEventArgs e)
     {
         if (sender is CheckBox checkBox && checkBox.Tag is TaskObjectiveWithLocation objective)
         {
@@ -2899,12 +3011,17 @@ public partial class MapPage : UserControl
                 objective.TaskNormalizedName,
                 objective.ObjectiveIndex);
             // 마커 새로고침
-            RefreshQuestMarkers();
+            try
+            {
+                var ct = GetNewCancellationToken();
+                await RefreshQuestMarkers(ct);
+            }
+            catch (OperationCanceledException) { }
             RefreshQuestDrawer();
         }
     }
 
-    private void ObjectiveCheckBox_Unchecked(object sender, RoutedEventArgs e)
+    private async void ObjectiveCheckBox_Unchecked(object sender, RoutedEventArgs e)
     {
         if (sender is CheckBox checkBox && checkBox.Tag is TaskObjectiveWithLocation objective)
         {
@@ -2915,12 +3032,17 @@ public partial class MapPage : UserControl
                 objective.TaskNormalizedName,
                 objective.ObjectiveIndex);
             // 마커 새로고침
-            RefreshQuestMarkers();
+            try
+            {
+                var ct = GetNewCancellationToken();
+                await RefreshQuestMarkers(ct);
+            }
+            catch (OperationCanceledException) { }
             RefreshQuestDrawer();
         }
     }
 
-    private void ChkHideCompletedObjectives_Changed(object sender, RoutedEventArgs e)
+    private async void ChkHideCompletedObjectives_Changed(object sender, RoutedEventArgs e)
     {
         _hideCompletedObjectives = ChkHideCompletedObjectives?.IsChecked ?? true;
 
@@ -2928,7 +3050,12 @@ public partial class MapPage : UserControl
         SettingsService.Instance.MapHideCompletedObjectives = _hideCompletedObjectives;
 
         // 마커 새로고침
-        RefreshQuestMarkers();
+        try
+        {
+            var ct = GetNewCancellationToken();
+            await RefreshQuestMarkers(ct);
+        }
+        catch (OperationCanceledException) { }
 
         // Drawer 새로고침
         if (QuestDrawerPanel.Visibility == Visibility.Visible)
@@ -3308,36 +3435,41 @@ public partial class MapPage : UserControl
         }
     }
 
-    private void ChkMapMarker_Changed(object sender, RoutedEventArgs e)
+    private async void ChkMapMarker_Changed(object sender, RoutedEventArgs e)
     {
         if (!IsLoaded) return;
 
-        var mapSettings = MapSettings.Instance;
+        try
+        {
+            var ct = GetNewCancellationToken();
+            var mapSettings = MapSettings.Instance;
 
-        // 각 체크박스 상태 저장
-        _showPmcSpawnsMarker = ChkShowPmcSpawns?.IsChecked ?? true;
-        _showSniperScavsMarker = ChkShowSniperScavs?.IsChecked ?? true;
-        _showRoguesMarker = ChkShowRogues?.IsChecked ?? true;
-        _showCultistsMarker = ChkShowCultists?.IsChecked ?? true;
-        _showLeversMarkerOverlay = ChkShowLeversMarker?.IsChecked ?? true;
-        _showBossesMarker = ChkShowBosses?.IsChecked ?? true;
+            // 각 체크박스 상태 저장
+            _showPmcSpawnsMarker = ChkShowPmcSpawns?.IsChecked ?? true;
+            _showSniperScavsMarker = ChkShowSniperScavs?.IsChecked ?? true;
+            _showRoguesMarker = ChkShowRogues?.IsChecked ?? true;
+            _showCultistsMarker = ChkShowCultists?.IsChecked ?? true;
+            _showLeversMarkerOverlay = ChkShowLeversMarker?.IsChecked ?? true;
+            _showBossesMarker = ChkShowBosses?.IsChecked ?? true;
 
-        // 설정 저장
-        mapSettings.ShowPmcSpawns = _showPmcSpawnsMarker;
-        mapSettings.ShowSniperScavs = _showSniperScavsMarker;
-        mapSettings.ShowRogues = _showRoguesMarker;
-        mapSettings.ShowCultists = _showCultistsMarker;
-        mapSettings.ShowLevers = _showLeversMarkerOverlay;
-        mapSettings.ShowBosses = _showBossesMarker;
+            // 설정 저장
+            mapSettings.ShowPmcSpawns = _showPmcSpawnsMarker;
+            mapSettings.ShowSniperScavs = _showSniperScavsMarker;
+            mapSettings.ShowRogues = _showRoguesMarker;
+            mapSettings.ShowCultists = _showCultistsMarker;
+            mapSettings.ShowLevers = _showLeversMarkerOverlay;
+            mapSettings.ShowBosses = _showBossesMarker;
 
-        // 마커 새로고침
-        RefreshMapMarkers();
+            // 마커 새로고침
+            await RefreshMapMarkers(ct);
+        }
+        catch (OperationCanceledException) { }
     }
 
     /// <summary>
     /// Map Markers (PMC Spawn, Sniper Scav, Rogue, Cultist, Boss, Lever) 새로고침
     /// </summary>
-    private void RefreshMapMarkers()
+    private async Task RefreshMapMarkers(CancellationToken ct = default)
     {
         if (_mapMarkersManager == null) return;
 
@@ -3355,7 +3487,7 @@ public partial class MapPage : UserControl
         _mapMarkersManager.SetZoomLevel(_zoomLevel);
 
         // 마커 새로고침
-        _mapMarkersManager.RefreshMarkers();
+        await _mapMarkersManager.RefreshMarkersAsync(ct);
     }
 
     private void MapViewer_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)

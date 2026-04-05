@@ -89,10 +89,10 @@
                             Background="{StaticResource BackgroundLightBrush}" CornerRadius="18" Padding="2">
                         <StackPanel Orientation="Horizontal">
                             <RadioButton x:Name="RadioPvp" Content="PVP" Style="{StaticResource ProfileToggleStyle}" 
-                                         IsChecked="True" Checked="ProfileRadio_Checked"
+                                         Tag="Pvp" GroupName="ProfileGroup"
                                          ToolTip="PVP 모드 데이터를 표시합니다."/>
                             <RadioButton x:Name="RadioPve" Content="PVE" Style="{StaticResource ProfileToggleStyle}" 
-                                         Checked="ProfileRadio_Checked"
+                                         Tag="Pve" GroupName="ProfileGroup"
                                          ToolTip="PVE 모드 데이터를 표시합니다."/>
                         </StackPanel>
                     </Border>
@@ -543,7 +543,43 @@
                                     </StackPanel>
                                 </Border>
 
-                                <!-- Font Size Section -->
+                                                                 <!-- Font Family Section -->
+                                 <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}"
+                                         Margin="0,12,0,0" Padding="0,16,0,0">
+                                     <StackPanel>
+                                         <TextBlock x:Name="TxtFontLabel" Text="글꼴"
+                                                    FontSize="{DynamicResource FontSizeSmall}" FontWeight="SemiBold"
+                                                    Foreground="{StaticResource TextPrimaryBrush}"
+                                                    Margin="0,0,0,8"/>
+
+                                         <TextBlock x:Name="TxtFontDesc" Text="어플리케이션의 글꼴을 변경합니다. Fonts 폴더의 폰트 파일을 인식합니다."
+                                                    FontSize="{DynamicResource FontSizeXSmall}"
+                                                    Foreground="{StaticResource TextSecondaryBrush}"
+                                                    TextWrapping="Wrap"
+                                                    Margin="0,0,0,12"/>
+
+                                         <Grid>
+                                             <Grid.ColumnDefinitions>
+                                                 <ColumnDefinition Width="*"/>
+                                                 <ColumnDefinition Width="Auto"/>
+                                             </Grid.ColumnDefinitions>
+                                             <ComboBox x:Name="ComboFontFamily" 
+                                                       Grid.Column="0"
+                                                       Margin="0,0,4,0"
+                                                       SelectionChanged="ComboFontFamily_SelectionChanged"/>
+                                             <Button x:Name="BtnRefreshFonts" 
+                                                     Grid.Column="1"
+                                                     Content="↻" 
+                                                     FontSize="16"
+                                                     Padding="8,2"
+                                                     ToolTip="글꼴 목록 새로고침"
+                                                     Click="BtnRefreshFonts_Click"
+                                                     Style="{StaticResource {x:Static ToolBar.ButtonStyleKey}}"/>
+                                         </Grid>
+                                     </StackPanel>
+
+                                 </Border>
+<!-- Font Size Section -->
                                 <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}"
                                         Margin="0,12,0,0" Padding="0,16,0,0">
                                     <StackPanel>

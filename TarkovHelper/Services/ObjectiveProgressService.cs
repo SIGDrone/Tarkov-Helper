@@ -23,8 +23,7 @@ namespace TarkovHelper.Services
 
         private ObjectiveProgressService()
         {
-            // Initial load is called from QuestProgressService or independently
-            LoadObjectiveProgress();
+            // 초기화는 외부에서 비동기적으로 호출되어야 합니다.
         }
 
         #region Objective Status
@@ -201,7 +200,7 @@ namespace TarkovHelper.Services
 
         public void SaveObjectiveProgress()
         {
-            Task.Run(async () => await SaveObjectiveProgressToDbAsync()).GetAwaiter().GetResult();
+            _ = SaveObjectiveProgressToDbAsync();
         }
 
         private async Task SaveObjectiveProgressToDbAsync()
@@ -250,9 +249,14 @@ namespace TarkovHelper.Services
             }
         }
 
-        public void LoadObjectiveProgress()
+        public async Task LoadObjectiveProgressAsync()
         {
-            Task.Run(async () => await LoadObjectiveProgressFromDbAsync()).GetAwaiter().GetResult();
+            await LoadObjectiveProgressFromDbAsync();
+        }
+
+        private void LoadObjectiveProgress()
+        {
+            _ = LoadObjectiveProgressFromDbAsync();
         }
 
         private async Task LoadObjectiveProgressFromDbAsync()

@@ -51,7 +51,7 @@ public class MapCustomMarkerManager
         _zoomLevel = zoomLevel;
     }
 
-    public async Task RefreshMarkersAsync()
+    public async Task RefreshMarkersAsync(CancellationToken ct = default)
     {
         if (string.IsNullOrEmpty(_currentMapKey))
         {
@@ -61,10 +61,14 @@ public class MapCustomMarkerManager
 
         try
         {
-            var markers = await _userDataDb.LoadCustomMarkersAsync(_currentMapKey);
+            var markers = await _userDataDb.LoadCustomMarkersAsync(_currentMapKey).WaitAsync(ct);
             Markers.Clear();
             foreach (var m in markers) Markers.Add(m);
             UpdateMarkerDisplay();
+        }
+        catch (OperationCanceledException)
+        {
+            // 중단됨
         }
         catch (Exception ex)
         {

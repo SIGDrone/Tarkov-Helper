@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Win32;
 using TarkovHelper.Debug;
+using TarkovHelper.Models;
 using TarkovHelper.Services.Logging;
 using TarkovHelper.Services.Settings;
 
@@ -16,7 +17,14 @@ public class SettingsService
 {
     private static readonly ILogger _log = Log.For<SettingsService>();
     private static SettingsService? _instance;
-    public static SettingsService Instance => _instance ??= new SettingsService();
+    public static SettingsService Instance
+    {
+        get
+        {
+            if (_instance == null) _instance = new SettingsService();
+            return _instance;
+        }
+    }
 
     private readonly UserDataDbService _userDataDb = UserDataDbService.Instance;
 
@@ -39,6 +47,9 @@ public class SettingsService
     private const string KeyHasEodEdition = "app.hasEodEdition";
     private const string KeyHasUnheardEdition = "app.hasUnheardEdition";
     private const string KeyPrestigeLevel = "app.prestigeLevel";
+    private const string KeyFontFamilyName = "app.fontFamilyName";
+    private const string KeyLastProfileType = "app.lastProfileType";
+
 
     // Map settings keys moved to MapSettings service
 
@@ -59,6 +70,9 @@ public class SettingsService
     private bool? _hasEodEdition;
     private bool? _hasUnheardEdition;
     private int? _prestigeLevel;
+    private string? _fontFamilyName;
+    private ProfileType? _lastProfileType;
+
 
     // Map cached values moved to MapSettings service
 
@@ -71,10 +85,13 @@ public class SettingsService
     public event EventHandler<bool>? HasEodEditionChanged;
     public event EventHandler<bool>? HasUnheardEditionChanged;
     public event EventHandler<int>? PrestigeLevelChanged;
+    public event EventHandler<string>? FontFamilyNameChanged;
+
 
     private SettingsService()
     {
-        LoadSettings();
+        _instance = this;
+        // LoadSettings()는 각 속성 접근 시 지연 로딩(Lazy Loading)됩니다.
     }
 
     /// <summary>
@@ -98,6 +115,12 @@ public class SettingsService
     public const double MinFontSize = 10;
     public const double MaxFontSize = 28;
     public const double DefaultBaseFontSize = 18;
+
+    /// <summary>
+    /// Default font family name
+    /// </summary>
+    public const string DefaultFontFamilyName = "Maplestory";
+
 
     /// <summary>
     /// DSP Decode count constants (for Make Amends quest branches)
@@ -422,6 +445,49 @@ public class SettingsService
         }
     }
 
+    /// <summary>
+    /// Selected font family name for the application
+    /// </summary>
+    public string FontFamilyName
+    {
+        get
+        {
+            if (!_settingsLoaded) LoadSettings();
+            return _fontFamilyName ?? DefaultFontFamilyName;
+        }
+        set
+        {
+            if (_fontFamilyName != value)
+            {
+                _lastProfileType = null; // Reset cached value just in case, though not strictly needed here
+                _fontFamilyName = value;
+                SaveSetting(KeyFontFamilyName, value);
+                FontFamilyNameChanged?.Invoke(this, value);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Last selected profile type (PVP or PVE)
+    /// </summary>
+    public ProfileType LastProfileType
+    {
+        get
+        {
+            if (!_settingsLoaded) LoadSettings();
+            return _lastProfileType ?? ProfileType.Pvp;
+        }
+        set
+        {
+            if (_lastProfileType != value)
+            {
+                _lastProfileType = value;
+                SaveSetting(KeyLastProfileType, value.ToString(), ProfileType.Pvp);
+            }
+        }
+    }
+
+
     #region Map Settings (Facade - delegates to MapSettings)
 
     // Map settings are now managed by MapSettings service.
@@ -706,12 +772,12 @@ public class SettingsService
                Directory.Exists(steamBuildPath);
     }
 
-    private void SaveSetting(string key, string value)
+    private void SaveSetting(string key, string value, ProfileType? profileType = null)
     {
         try
         {
             _log.Debug($"SaveSetting called: key={key}, value={value}");
-            _userDataDb.SetSetting(key, value);
+            _userDataDb.SetSetting(key, value, profileType);
             _log.Debug($"SaveSetting success: key={key}");
         }
         catch (Exception ex)
@@ -769,6 +835,7 @@ public class SettingsService
         _hasEodEdition = null;
         _hasUnheardEdition = null;
         _prestigeLevel = null;
+        _lastProfileType = null;
 
         _settingsLoaded = true;
 
@@ -778,6 +845,9 @@ public class SettingsService
             MigrateFromJsonIfNeeded();
 
             // Load from DB
+            if (Enum.TryParse<ProfileType>(_userDataDb.GetSetting(KeyLastProfileType, ProfileType.Pvp), out var profileType))
+                _lastProfileType = profileType;
+
             _logFolderPath = _userDataDb.GetSetting(KeyLogFolderPath);
             if (string.IsNullOrEmpty(_logFolderPath)) _logFolderPath = null;
 
@@ -816,6 +886,12 @@ public class SettingsService
 
             if (int.TryParse(_userDataDb.GetSetting(KeyPrestigeLevel), out var prestige))
                 _prestigeLevel = prestige;
+
+            _fontFamilyName = _userDataDb.GetSetting(KeyFontFamilyName);
+            if (string.IsNullOrEmpty(_fontFamilyName)) _fontFamilyName = null;
+
+
+
 
             // Map settings are now loaded by MapSettings service
         }

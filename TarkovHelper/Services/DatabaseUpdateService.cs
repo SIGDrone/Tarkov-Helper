@@ -27,9 +27,11 @@ public sealed class DatabaseUpdateService : IDisposable
     private readonly string _databasePath;
     private readonly string _versionFilePath;
     private readonly HttpClient _httpClient;
-    private readonly System.Threading.Timer _updateTimer;
+    private System.Threading.Timer _updateTimer;
+    private Task<UpdateCheckResult>? _currentUpdateTask;
     private bool _isUpdating;
     private bool _disposed;
+
 
     /// <summary>
     /// 데이터베이스 파일 경로
@@ -145,17 +147,37 @@ public sealed class DatabaseUpdateService : IDisposable
     /// </summary>
     public async Task<UpdateCheckResult> CheckAndUpdateAsync()
     {
-        if (_isUpdating)
+        // 이미 업데이트가 진행 중이면 해당 태스크를 반환하여 호출자가 기다릴 수 있게 함
+        if (_isUpdating && _currentUpdateTask != null)
         {
-            _log.Debug("Update already in progress, skipping");
-            return new UpdateCheckResult(false, false, "업데이트가 이미 진행 중입니다");
+            _log.Debug("Update already in progress, joining existing task");
+            return await _currentUpdateTask;
         }
 
         _isUpdating = true;
+        _currentUpdateTask = DoCheckAndUpdateAsync();
+
+        try
+        {
+            return await _currentUpdateTask;
+        }
+        finally
+        {
+            _isUpdating = false;
+            _currentUpdateTask = null;
+        }
+    }
+
+    /// <summary>
+    /// 실제 업데이트 확인 및 필요시 다운로드 수행
+    /// </summary>
+    private async Task<UpdateCheckResult> DoCheckAndUpdateAsync()
+    {
         UpdateCheckStarted?.Invoke(this, EventArgs.Empty);
 
         try
         {
+
             // 1. 원격 버전 확인
             _log.Debug("Checking remote version...");
             var remoteVersion = await GetRemoteVersionAsync();
@@ -210,9 +232,9 @@ public sealed class DatabaseUpdateService : IDisposable
         }
         finally
         {
-            _isUpdating = false;
         }
     }
+
 
     /// <summary>
     /// 원격 버전 정보 가져오기 (tarkov.dev API 우선)

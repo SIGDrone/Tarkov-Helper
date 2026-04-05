@@ -33,6 +33,7 @@ public partial class MainWindow : Window
     private MapPage? _mapTrackerPage;
     private List<HideoutModule>? _hideoutModules;
     private bool _isFullScreen;
+    private FileSystemWatcher? _fontWatcher;
 
     // Windows API for dark title bar
     [DllImport("dwmapi.dll", PreserveSig = true)]
@@ -42,6 +43,7 @@ public partial class MainWindow : Window
 
     public MainWindow()
     {
+        _isLoading = true; // InitializeComponent 중 발생하는 ProfileRadio_Checked 이벤트를 차단하기 위해 미리 true로 설정합니다.
         InitializeComponent();
         _loc.LanguageChanged += OnLanguageChanged;
         _settingsService.PlayerLevelChanged += OnPlayerLevelChanged;
@@ -50,9 +52,28 @@ public partial class MainWindow : Window
         _settingsService.HasEodEditionChanged += OnEditionChanged;
         _settingsService.HasUnheardEditionChanged += OnEditionChanged;
         _settingsService.PrestigeLevelChanged += OnPrestigeLevelChanged;
+        _settingsService.FontFamilyNameChanged += OnFontFamilyNameChanged;
+        ProfileService.Instance.ProfileChanged += OnProfileChanged;
 
         // Apply dark title bar
         SourceInitialized += (s, e) => EnableDarkTitleBar();
+    }
+
+    private void OnProfileChanged(object? sender, ProfileType e)
+    {
+        // 데이터 -> UI 동기화
+        _isLoading = true; // 이벤트 루프 방지
+        try
+        {
+            if (e == ProfileType.Pve)
+                RadioPve.IsChecked = true;
+            else
+                RadioPvp.IsChecked = true;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
     }
 
     private void EnableDarkTitleBar()
@@ -76,38 +97,313 @@ public partial class MainWindow : Window
     {
         _isLoading = true;
 
-        // Initialize player level UI
+        // 1. 데이터베이스(tarkov_data.db) 존재 여부 확인 및 선제적 다운로드
+        var dbPath = DatabaseUpdateService.Instance.DatabasePath;
+        if (!File.Exists(dbPath))
+        {
+            LoadingOverlay.Visibility = Visibility.Visible;
+            LoadingStatusText.Text = "데이터를 다운로드 중입니다. 잠시만 기다려주세요...";
+            TabContentArea.Visibility = Visibility.Collapsed; // 다운로드 중에는 탭 숨김
+            
+            try
+            {
+                await DatabaseUpdateService.Instance.CheckAndUpdateAsync();
+            }
+            finally
+            {
+                LoadingOverlay.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        // 2. 서비스 리셋 및 초기화
+        QuestProgressService.ResetInstance();
+        ItemInventoryService.ResetInstance();
+        HideoutProgressService.ResetInstance();
+        await UserDataDbService.Instance.InitializeAsync();
+        
         UpdatePlayerLevelUI();
-
-        // Initialize Scav Rep UI
         UpdateScavRepUI();
-
-        // Initialize DSP Decode Count UI
         UpdateDspDecodeUI();
-
-        // Initialize Edition and Prestige Level UI
         UpdateEditionUI();
         UpdatePrestigeLevelUI();
-
-        // Initialize profile toggle state
-        if (ProfileService.Instance.CurrentProfile == ProfileType.Pve)
-            RadioPve.IsChecked = true;
-        else
-            RadioPvp.IsChecked = true;
-
         UpdateAllLocalizedText();
 
-        _isLoading = false;
+        // 3. 현재 프로필 로드 및 데이터 무결성 검증 (내부적으로 데이터 로드 대기 수행)
+        var currentProfile = ProfileService.Instance.CurrentProfile;
+        OnProfileChanged(this, currentProfile);
 
-        // Start database update check (initial check + background updates every 5 minutes)
+        // RefreshCurrentProfileDataAsync 호출로 모든 페이지 객체 생성 및 데이터 로드 실천
+        await RefreshCurrentProfileDataAsync();
+
+        // 4. 기타 백그라운드 서비스 시작
+        InitializeFontSettings();
+        ApplyFont(_settingsService.FontFamilyName);
         StartDatabaseUpdateService();
-
-        // Load and show quest data from DB
-        await CheckAndRefreshDataAsync();
-
-        // Auto-start log monitoring if enabled
         AutoStartLogMonitoring();
+
+        RadioPvp.Checked += ProfileRadio_Checked;
+        RadioPve.Checked += ProfileRadio_Checked;
+
+        _isLoading = false;
     }
+    #region Font Settings
+
+    private void InitializeFontSettings()
+    {
+        try
+        {
+            var fontDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Fonts");
+            if (!Directory.Exists(fontDir))
+            {
+                Directory.CreateDirectory(fontDir);
+                LogFontDebug("Fonts directory created.");
+            }
+
+            var fontFiles = Directory.GetFiles(fontDir, "*.*")
+                .Where(f => f.EndsWith(".ttf", StringComparison.OrdinalIgnoreCase) || 
+                            f.EndsWith(".otf", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            var fontItems = new List<FontItem>();
+            var koCulture = System.Globalization.CultureInfo.GetCultureInfo("ko-KR");
+            var enCulture = System.Globalization.CultureInfo.GetCultureInfo("en-US");
+            var koXmlLang = System.Windows.Markup.XmlLanguage.GetLanguage("ko-KR");
+            var enXmlLang = System.Windows.Markup.XmlLanguage.GetLanguage("en-US");
+
+            foreach (var file in fontFiles)
+            {
+                string fileName = Path.GetFileName(file);
+                string? internalName = null;
+                
+                try
+                {
+                    // Phase 1: GlyphTypeface
+                    var glyphTypeface = new System.Windows.Media.GlyphTypeface(new Uri(file));
+                    if (glyphTypeface.FamilyNames != null)
+                    {
+                        if (glyphTypeface.FamilyNames.TryGetValue(koCulture, out var koName))
+                            internalName = koName;
+                        else if (glyphTypeface.FamilyNames.TryGetValue(enCulture, out var enName))
+                            internalName = enName;
+                        else
+                            internalName = glyphTypeface.FamilyNames.Values.FirstOrDefault();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogFontDebug($"DEBUG: GlyphTypeface failed for {fileName}: {ex.Message}");
+                }
+
+                // Phase 2: Typeface fallback
+                if (string.IsNullOrEmpty(internalName))
+                {
+                    try
+                    {
+                        var typefaces = System.Windows.Media.Fonts.GetTypefaces(new Uri(file));
+                        var firstTypeface = typefaces.FirstOrDefault();
+                        if (firstTypeface?.FontFamily?.FamilyNames != null)
+                        {
+                            var names = firstTypeface.FontFamily.FamilyNames;
+                            if (names.TryGetValue(koXmlLang, out var koName))
+                                internalName = koName;
+                            else if (names.TryGetValue(enXmlLang, out var enName))
+                                internalName = enName;
+                            else
+                                internalName = names.Values.FirstOrDefault();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        LogFontDebug($"DEBUG: GetTypefaces failed for {fileName}: {ex.Message}");
+                    }
+                }
+
+                // Phase 3: Filename fallback
+                if (string.IsNullOrEmpty(internalName))
+                {
+                    internalName = Path.GetFileNameWithoutExtension(file);
+                }
+
+                if (!string.IsNullOrEmpty(internalName))
+                {
+                    fontItems.Add(new FontItem 
+                    { 
+                        InternalName = internalName, 
+                        FileName = fileName,
+                        DisplayName = fileName // Use filename as display name per user request
+                    });
+                }
+            }
+
+            // Sort by DisplayName
+            fontItems = fontItems.OrderBy(i => i.DisplayName).ToList();
+            
+            // Add internal default at the very top
+            fontItems.Insert(0, new FontItem 
+            { 
+                DisplayName = "기본", 
+                InternalName = "Maplestory", 
+                FileName = "" 
+            });
+
+            LogFontDebug($"Scan complete. Found {fontItems.Count} font options (including default).");
+
+            ComboFontFamily.SelectionChanged -= ComboFontFamily_SelectionChanged;
+            ComboFontFamily.ItemsSource = null;
+            ComboFontFamily.ItemsSource = fontItems;
+
+            // set current selection
+            var savedSetting = _settingsService.FontFamilyName;
+            var (savedIname, savedFname) = FontItem.ParseSetting(savedSetting);
+
+            FontItem? toSelect = null;
+            if (!string.IsNullOrEmpty(savedFname))
+            {
+                toSelect = fontItems.FirstOrDefault(i => i.FileName.Equals(savedFname, StringComparison.OrdinalIgnoreCase));
+            }
+            
+            if (toSelect == null && !string.IsNullOrEmpty(savedIname))
+            {
+                // Try to match internal name
+                toSelect = fontItems.FirstOrDefault(i => i.InternalName.Equals(savedIname, StringComparison.OrdinalIgnoreCase));
+            }
+
+            // If still nothing matches (or it's the first run), default to our manual 'Maplestory' entry
+            if (toSelect == null)
+            {
+                toSelect = fontItems.FirstOrDefault(i => i.InternalName == "Maplestory" && string.IsNullOrEmpty(i.FileName));
+            }
+
+            if (toSelect != null)
+            {
+                ComboFontFamily.SelectedItem = toSelect;
+            }
+            // Removed: else if (fontItems.Count > 0) { ComboFontFamily.SelectedIndex = 0; }
+            // This prevents accidental auto-selection of discovered files on first run.
+
+            ComboFontFamily.SelectionChanged += ComboFontFamily_SelectionChanged;
+
+            // Initialize FileSystemWatcher if not already done
+            if (_fontWatcher == null)
+            {
+                _fontWatcher = new FileSystemWatcher(fontDir)
+                {
+                    Filter = "*.*", 
+                    EnableRaisingEvents = true,
+                    NotifyFilter = NotifyFilters.FileName | 
+                                   NotifyFilters.DirectoryName | 
+                                   NotifyFilters.Attributes | 
+                                   NotifyFilters.Size | 
+                                   NotifyFilters.LastWrite
+                };
+
+                _fontWatcher.Created += (s, e) => { LogFontDebug($"Watcher: Created {e.Name}"); RequestFontRefresh(); };
+                _fontWatcher.Deleted += (s, e) => { LogFontDebug($"Watcher: Deleted {e.Name}"); RequestFontRefresh(); };
+                _fontWatcher.Renamed += (s, e) => { LogFontDebug($"Watcher: Renamed {e.OldName} -> {e.Name}"); RequestFontRefresh(); };
+                _fontWatcher.Changed += (s, e) => { LogFontDebug($"Watcher: Changed {e.Name}"); RequestFontRefresh(); };
+
+                LogFontDebug("FileSystemWatcher initialized and started.");
+            }
+        }
+        catch (Exception ex)
+        {
+            _log.Error($"Failed to initialize fonts: {ex.Message}");
+            LogFontDebug($"ERR: {ex.Message}");
+        }
+    }
+
+    private void LogFontDebug(string message)
+    {
+        try
+        {
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "font_debug.log");
+            File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss}] {message}\n");
+            _log.Debug($"FontDebug: {message}");
+        }
+        catch { }
+    }
+
+    private void BtnRefreshFonts_Click(object sender, RoutedEventArgs e)
+    {
+        InitializeFontSettings();
+    }
+
+    private System.Threading.Timer? _fontRefreshTimer;
+
+    private void RequestFontRefresh()
+    {
+        // Debounce refresh requests
+        _fontRefreshTimer?.Dispose();
+        _fontRefreshTimer = new System.Threading.Timer(_ =>
+        {
+            Dispatcher.Invoke(() => InitializeFontSettings());
+        }, null, 500, Timeout.Infinite);
+    }
+
+    private void ApplyFont(string setting)
+    {
+        try
+        {
+            var (fontFamilyName, fileName) = FontItem.ParseSetting(setting);
+            if (string.IsNullOrEmpty(fontFamilyName)) return;
+
+            var fontDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Fonts");
+            FontFamily? family = null;
+
+            if (!string.IsNullOrEmpty(fileName) && Directory.Exists(fontDir))
+            {
+                var filePath = Path.Combine(fontDir, fileName);
+                if (File.Exists(filePath))
+                {
+                    // More robust URI construction for local font files
+                    var folderUri = new Uri(fontDir.EndsWith("/") ? fontDir : fontDir + "/");
+                    family = new FontFamily(folderUri, $"./{fileName}#{fontFamilyName}");
+                    LogFontDebug($"Constructed FontFamily URI: {folderUri} with source ./{fileName}#{fontFamilyName}");
+                }
+            }
+
+            if (family == null)
+            {
+                // If it's our internal default "Maplestory", use the pack URI explicitly
+                if (fontFamilyName.Equals("Maplestory", StringComparison.OrdinalIgnoreCase))
+                {
+                    family = new FontFamily(new Uri("pack://application:,,,/Fonts/"), "./#Maplestory");
+                }
+                else
+                {
+                    family = new FontFamily(fontFamilyName);
+                }
+            }
+
+            Application.Current.Resources["MaplestoryFont"] = family;
+            _log.Debug($"Applied font: {fontFamilyName} (from {fileName ?? "system"})");
+        }
+        catch (Exception ex)
+        {
+            _log.Error($"Failed to apply font {setting}: {ex.Message}");
+        }
+    }
+
+    private void ComboFontFamily_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isLoading || ComboFontFamily.SelectedItem == null) return;
+
+        if (ComboFontFamily.SelectedItem is FontItem selectedFontItem)
+        {
+            _settingsService.FontFamilyName = selectedFontItem.ToSettingString();
+        }
+    }
+
+    private void OnFontFamilyNameChanged(object? sender, string newFontName)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            ApplyFont(newFontName);
+        });
+    }
+
+    #endregion
+
 
     /// <summary>
     /// 데이터베이스 업데이트 서비스 시작
@@ -283,12 +579,21 @@ public partial class MainWindow : Window
 
         try
         {
+            // 현재 프로필 정보를 명시적으로 전달하여 각 서비스 초기화
+            var currentProfile = ProfileService.Instance.CurrentProfile;
+
             // DB에서 퀘스트 데이터 로드
-            if (await progressService.InitializeFromDbAsync())
+            if (await progressService.InitializeFromDbAsync(currentProfile))
             {
                 tasks = progressService.AllTasks.ToList();
-                _log.Debug($"Loaded {tasks.Count} quests from DB");
+                _log.Debug($"Loaded {tasks.Count} quests from DB for {currentProfile}");
             }
+
+            // ObjectiveProgressService 비동기 로드
+            await ObjectiveProgressService.Instance.LoadObjectiveProgressAsync();
+
+            // ItemInventoryService 비동기 로드
+            await ItemInventoryService.Instance.LoadInventoryAsync();
         }
         catch (Exception ex)
         {
@@ -303,6 +608,9 @@ public partial class MainWindow : Window
         {
             _hideoutModules = hideoutDbService.AllStations.ToList();
             _log.Debug($"Hideout modules count: {_hideoutModules.Count}");
+            
+            // HideoutProgressService 비동기 초기화
+            await HideoutProgressService.Instance.InitializeAsync(_hideoutModules);
         }
         else
         {
@@ -404,53 +712,76 @@ public partial class MainWindow : Window
     /// </summary>
     private async Task RefreshCurrentProfileDataAsync()
     {
-        ShowLoadingOverlay($"{ProfileService.Instance.CurrentProfile} 데이터 로드 중...");
+        ShowLoadingOverlay($"{ProfileService.Instance.CurrentProfile.ToString().ToUpper()} 데이터 로드 중...");
 
         try
         {
-            // 1. 서비스들 설정 재로딩 (DB에서 현재 프로필 데이터 가져옴)
-            _settingsService.ReloadSettings();
-            await QuestProgressService.Instance.InitializeFromDbAsync();
-            _hideoutProgressService.ReloadProgress();
-            ItemInventoryService.Instance.ReloadInventory();
-            // CustomMapMarkerService 등 다른 서비스가 있다면 추가
+            var currentProfile = ProfileService.Instance.CurrentProfile;
+            
+            // 1. 서비스들을 물리적으로 리셋
+            QuestProgressService.ResetInstance();
+            ItemInventoryService.ResetInstance();
+            HideoutProgressService.ResetInstance();
 
-            // 2. 메인 UI 요소들 동기화
+            // 2. 백엔드 서비스 리셋 및 데이터 다시 로드
+            _settingsService.ReloadSettings();
+            await QuestProgressService.Instance.InitializeFromDbAsync(currentProfile);
+            
+            // [중요] 은신처 데이터 DB로부터 명시적 로드 및 주입
+            await HideoutDbService.Instance.LoadStationsAsync();
+            await HideoutProgressService.Instance.InitializeAsync(HideoutDbService.Instance.AllStations.ToList());
+
+            await HideoutProgressService.Instance.ReloadProgressAsync();
+            await ItemInventoryService.Instance.InitializeAsync();
+
+            // 3. [핵심] 데이터 무결성 검증 루프 (최대 3초)
+            // 퀘스트와 은신처 데이터가 모두 채워질 때까지 기다려 화이트아웃 방지
+            int retryCount = 0;
+            while ((QuestProgressService.Instance.AllTasks.Count == 0 || 
+                    HideoutProgressService.Instance.AllModules.Count == 0) && retryCount < 30)
+            {
+                await Task.Delay(100);
+                retryCount++;
+                // 1초마다 재시도 강제 호출
+                {
+                    await QuestProgressService.Instance.InitializeFromDbAsync(currentProfile);
+                    await HideoutDbService.Instance.LoadStationsAsync();
+                    await HideoutProgressService.Instance.InitializeAsync(HideoutDbService.Instance.AllStations.ToList());
+                    await HideoutProgressService.Instance.ReloadProgressAsync();
+                }
+            }
+
+            _log.Info($"Data verification complete. Quests: {QuestProgressService.Instance.AllTasks.Count}, Retry: {retryCount}");
+
+            // 4. UI 페이지 인스턴스를 완전히 새로 생성 (UI 잔상 박멸 핵심)
+            _questListPage = new QuestListPage();
+            _itemsPage = new ItemsPage();
+            _collectorPage = new CollectorPage();
+            
+            // 은신처 모듈 데이터가 있을 때만 페이지 생성
+            var hideoutModules = HideoutProgressService.Instance.AllModules;
+            _hideoutPage = (hideoutModules != null && hideoutModules.Count > 0) ? new HideoutPage() : null;
+            _mapTrackerPage = new MapPage();
+
+            // 5. 현재 탭에 맞는 새 페이지 화면에 할당
+            if (TabQuests.IsChecked == true) PageContent.Content = _questListPage;
+            else if (TabHideout.IsChecked == true) PageContent.Content = _hideoutPage;
+            else if (TabItems.IsChecked == true) PageContent.Content = _itemsPage;
+            else if (TabCollector.IsChecked == true) PageContent.Content = _collectorPage;
+            else if (TabMap.IsChecked == true) PageContent.Content = _mapTrackerPage;
+
             UpdatePlayerLevelUI();
             UpdateScavRepUI();
             UpdateDspDecodeUI();
             UpdateEditionUI();
             UpdatePrestigeLevelUI();
-
-            // 3. 현재 페이지 데이터 새로고침
-            if (PageContent.Content is QuestListPage questPage)
-            {
-                await questPage.ReloadDataAsync();
-            }
-            else if (PageContent.Content is HideoutPage hideoutPage)
-            {
-                await hideoutPage.ReloadDataAsync();
-            }
-            else if (PageContent.Content is ItemsPage itemsPage)
-            {
-                await itemsPage.ReloadDataAsync();
-            }
-            else if (PageContent.Content is CollectorPage collectorPage)
-            {
-                await collectorPage.ReloadDataAsync();
-            }
-            else if (PageContent.Content is MapPage mapPage)
-            {
-                // MapPage에도 ReloadDataAsync() 또는 유사한 로직이 필요할 수 있음
-                // 일단은 페이지를 새로 생성하여 교체함
-                _mapTrackerPage = new MapPage();
-                PageContent.Content = _mapTrackerPage;
-            }
+            
+            TabContentArea.Visibility = Visibility.Visible;
+            TxtWelcome.Visibility = Visibility.Collapsed;
         }
         catch (Exception ex)
         {
             _log.Error($"Profile refresh failed: {ex.Message}");
-            MessageBox.Show($"프로필을 불러오는 데 실패했습니다: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
         {
@@ -471,6 +802,14 @@ public partial class MainWindow : Window
         }
         else if (sender == TabHideout)
         {
+            if (_hideoutPage == null)
+            {
+                // 탭 전환 시점에 페이지가 없으면(데이터 로딩 지연 등) 다시 시도
+                var modules = HideoutProgressService.Instance.AllModules;
+                if (modules != null && modules.Count > 0)
+                    _hideoutPage = new HideoutPage();
+            }
+
             if (_hideoutPage != null)
             {
                 PageContent.Content = _hideoutPage;

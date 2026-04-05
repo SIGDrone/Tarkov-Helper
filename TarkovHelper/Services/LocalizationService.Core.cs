@@ -96,7 +96,10 @@ public partial class LocalizationService : INotifyPropertyChanged
     public string QuestLogSync => "퀘스트 로그 동기화";
     public string CacheManagement => "캐시 관리";
     public string FontSize => "글꼴 크기";
+    public string Font => "글꼴";
+    public string FontDesc => "어플리케이션에 사용할 글꼴을 선택합니다. Fonts 폴더의 폰트 파일(.ttf, .otf)을 자동으로 인식합니다.";
     public string Unknown => "알 수 없음";
+
     public string UpdateApiData => "API 데이터 업데이트";
     public string ApiUpdateCheck => "업데이트 확인 중...";
     public string ApiUpdateSuccess => "성공적으로 업데이트되었습니다.";
