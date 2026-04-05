@@ -266,20 +266,22 @@ public partial class MapPage : UserControl
 
             UpdateUI();
 
+            // [v1.1.37] 무거운 작업 전에 UI가 렌더링될 기회를 줌
+            await Task.Delay(50, ct);
+
             // 퀘스트 목표 데이터 로드
-            await Task.Yield();
             await LoadQuestObjectivesAsync(ct);
+            await Task.Delay(20, ct);
 
             // 탈출구 데이터 로드
-            await Task.Yield();
             await LoadExtractsAsync(ct);
+            await Task.Delay(20, ct);
 
             // Map Markers 데이터 로드
-            await Task.Yield();
             await LoadMapMarkersAsync(ct);
+            await Task.Delay(20, ct);
 
             // 층 감지 데이터 로드 (자동 층 전환용)
-            await Task.Yield();
             await FloorDetectionService.Instance.LoadFloorRangesAsync().WaitAsync(ct);
 
             // Drawer 기본 열기 및 내용 새로고침
@@ -301,6 +303,17 @@ public partial class MapPage : UserControl
         }
         catch (Exception ex)
         {
+            // 취소 관련 예외이거나 토큰이 이미 취소된 경우 무시 (가장 확실한 방법)
+            if (ex is OperationCanceledException || 
+                ex is TaskCanceledException || 
+                (_loadingCts?.IsCancellationRequested ?? false) ||
+                ex.Message.Contains("canceled", StringComparison.OrdinalIgnoreCase))
+            {
+                _log.Debug("Map loading task was cancelled, ignoring exception.");
+                return;
+            }
+
+            _log.Error("Critical error loading map page", ex);
             MessageBox.Show($"지도 추적 페이지 로드 오류: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }

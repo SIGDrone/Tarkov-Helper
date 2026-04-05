@@ -157,9 +157,9 @@ public class MapMarkersManager
         int count = 0;
         foreach (var marker in markers)
         {
-            // [v1.1.37] UI 부하 분산
+            // [v1.1.37] UI 부하 분산 (더 빈번하게 양보)
             count++;
-            if (count % 30 == 0) await Task.Yield();
+            if (count % 10 == 0) await Task.Delay(1, ct);
 
             ct.ThrowIfCancellationRequested();
 

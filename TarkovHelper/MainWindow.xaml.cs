@@ -753,7 +753,10 @@ public partial class MainWindow : Window
 
             _log.Info($"Data verification complete. Quests: {QuestProgressService.Instance.AllTasks.Count}, Retry: {retryCount}");
 
-            // 4. UI 페이지 인스턴스를 완전히 새로 생성 (UI 잔상 박멸 핵심)
+            // 4. 퀘스트 그래프 서비스 초기화 (의존성 추적 및 카파 게이지용)
+            QuestGraphService.Instance.Initialize(QuestProgressService.Instance.AllTasks.ToList());
+
+            // 5. UI 페이지 인스턴스를 완전히 새로 생성 (UI 잔상 박멸 핵심)
             _questListPage = new QuestListPage();
             _itemsPage = new ItemsPage();
             _collectorPage = new CollectorPage();

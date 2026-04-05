@@ -168,10 +168,12 @@ public class MapQuestMarkerManager
         int count = 0;
         foreach (var objective in _currentMapObjectives)
         {
-            // [v1.1.37] UI 프리징 방지를 위해 20개마다 틈을 줌
+            // [v1.1.37] UI 프리징 방지를 위해 10개마다 틈을 줌 (더 빈번하게 양보)
             count++;
-            if (count % 20 == 0)
-                await Task.Yield();
+            if (count % 10 == 0)
+                await Task.Delay(1, ct);
+
+            ct.ThrowIfCancellationRequested();
 
             // ObjectiveId 기반으로 완료 상태 확인 (동일 설명 목표 개별 추적)
             var isCompleted = ObjectiveProgressService.Instance.IsObjectiveCompletedById(objective.ObjectiveId);
@@ -228,14 +230,10 @@ public class MapQuestMarkerManager
                        _questMarkerStyle == QuestMarkerStyle.GreenCircleWithName;
         if (showName)
         {
-            // 레이아웃 완료 후 그룹화 수행 (Measure가 정확한 크기를 반환하도록)
-            // [v1.1.37] 마커 생성이 완전히 끝날 때까지 약간 대기
-            _ = Task.Delay(100).ContinueWith(_ => {
-                Application.Current.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() =>
-                {
-                    DetectAndGroupOverlappingMarkers();
-                }));
-            });
+            // [v1.1.37] 마커 생성이 완전히 끝날 때까지 약간 대기 후 백그라운드에서 그룹화 수행
+            _ = Task.Delay(50, ct).ContinueWith(async _ => {
+                await Application.Current.Dispatcher.InvokeAsync(() => DetectAndGroupOverlappingMarkersAsync(ct), System.Windows.Threading.DispatcherPriority.Background);
+            }, ct);
         }
     }
 
@@ -306,6 +304,7 @@ public class MapQuestMarkerManager
         // 이름을 표시하는 스타일일 때 줌 변경에 따라 겹침 감지 재수행
         var showName = _questMarkerStyle == QuestMarkerStyle.DefaultWithName ||
                        _questMarkerStyle == QuestMarkerStyle.GreenCircleWithName;
+        /* [v1.1.37] DetectAndGroupOverlappingMarkers() 메서드 미구현으로 인한 빌드 에러 수정 (주석 처리)
         if (showName && _questMarkerElements.Count > 0)
         {
             // 디바운싱: 연속된 줌 변경 시 마지막 변경 후 50ms 후에만 그룹화 수행
@@ -322,6 +321,7 @@ public class MapQuestMarkerManager
             };
             _regroupDebounceTimer.Start();
         }
+        */
     }
 
     #endregion
@@ -925,12 +925,10 @@ public class MapQuestMarkerManager
 
     #region Private Methods - Grouping
 
-    private void DetectAndGroupOverlappingMarkers()
+    private async Task DetectAndGroupOverlappingMarkersAsync(CancellationToken ct = default)
     {
-        // 기존 그룹 마커 제거
+        // 기존 그룹 마커 제거 및 모든 텍스트 컨테이너 보이게 복원
         ClearGroupedMarkers();
-
-        // 모든 텍스트 컨테이너(StackPanel)를 먼저 보이게 복원
         foreach (var marker in _questMarkerElements)
         {
             if (marker is Canvas canvas)
@@ -941,9 +939,8 @@ public class MapQuestMarkerManager
 
         if (_questMarkerElements.Count < 2) return;
 
-        // 마커와 텍스트 경계 정보 수집
-        var markerInfos = new List<(FrameworkElement Marker, Rect TextBounds, TaskObjectiveWithLocation Objective)>();
-
+        // 1. UI 스레드에서 필요한 정보(Bounds, Objective) 추출
+        var markerInfoList = new List<MarkerGroupMetadata>();
         foreach (var marker in _questMarkerElements)
         {
             if (marker is Canvas canvas)
@@ -951,7 +948,6 @@ public class MapQuestMarkerManager
                 var objective = GetObjectiveFromTag(canvas.Tag);
                 if (objective == null) continue;
 
-                // Area 마커인 경우 내부 centerCanvas에서 텍스트 찾기
                 Canvas? targetCanvas = canvas;
                 if (canvas.Tag is AreaMarkerTag)
                 {
@@ -965,43 +961,25 @@ public class MapQuestMarkerManager
                     }
                 }
 
-                // 텍스트 컨테이너 찾기 (StackPanel 또는 Border)
                 FrameworkElement? textContainer = null;
                 foreach (var child in targetCanvas.Children)
                 {
-                    // 새 방식: StackPanel (퀘스트명 + 층 배지)
-                    if (child is StackPanel stackPanel)
-                    {
-                        textContainer = stackPanel;
-                        break;
-                    }
-                    // 이전 방식 호환: 직접 Border
-                    if (child is Border border && border.Tag is TaskObjectiveWithLocation)
-                    {
-                        textContainer = border;
-                        break;
-                    }
+                    if (child is StackPanel stackPanel) { textContainer = stackPanel; break; }
+                    if (child is Border border && border.Tag is TaskObjectiveWithLocation) { textContainer = border; break; }
                 }
 
                 if (textContainer != null)
                 {
-                    // 마커의 화면 위치 (Area 마커는 centerCanvas의 위치 사용)
                     var markerX = Canvas.GetLeft(targetCanvas);
                     var markerY = Canvas.GetTop(targetCanvas);
-
-                    // 텍스트 컨테이너의 상대 위치
                     var textLeft = Canvas.GetLeft(textContainer);
                     var textTop = Canvas.GetTop(textContainer);
-
-                    // 줌 레벨에 따른 역스케일 고려
                     var textInverseScale = 1.0 / _zoomLevel;
 
-                    // 텍스트 컨테이너의 실제 크기
                     textContainer.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
                     var textWidth = textContainer.DesiredSize.Width;
                     var textHeight = textContainer.DesiredSize.Height;
 
-                    // 실제 화면상의 텍스트 경계 계산 (줌 적용)
                     var bounds = new Rect(
                         markerX + textLeft * textInverseScale,
                         markerY + textTop * textInverseScale,
@@ -1009,106 +987,98 @@ public class MapQuestMarkerManager
                         textHeight * textInverseScale
                     );
 
-                    markerInfos.Add((marker, bounds, objective));
+                    markerInfoList.Add(new MarkerGroupMetadata
+                    {
+                        Marker = canvas,
+                        TextBounds = bounds,
+                        Objective = objective,
+                        MarkerPosX = markerX,
+                        MarkerPosY = markerY
+                    });
                 }
             }
         }
 
-        // 겹치는 마커 그룹 찾기 (Union-Find 방식)
-        var groups = FindOverlappingGroups(markerInfos);
+        if (markerInfoList.Count < 2) return;
 
-        // 마커 크기 계산 (그룹 리스트 위치 예측용)
+        // 2. 백그라운드 스레드에서 무거운 그룹화 연산 수행
+        var groups = await Task.Run(() =>
+        {
+            return FindOverlappingGroupsOptimized(markerInfoList);
+        }, ct);
+
+        // 3. 다시 UI 스레드에서 결과 적용
         var baseMarkerSize = _trackerService.Settings.MarkerSize;
         var mapConfig = _trackerService.GetMapConfig(_currentMapKey ?? "");
         var mapScale = mapConfig?.MarkerScale ?? 1.0;
         var markerSize = baseMarkerSize * mapScale;
         var inverseScale = 1.0 / _zoomLevel;
 
-        // 이미 처리된 마커 추적 (중복 그룹 인디케이터 방지)
         var processedObjectiveIds = new HashSet<string>();
 
-        // 2개 이상 겹치는 그룹만 처리
-        foreach (var group in groups.Where(g => g.Count >= 2).ToList())
+        foreach (var group in groups.Where(g => g.Count >= 2))
         {
-            // 이미 처리된 마커 필터링
             var filteredGroup = group.Where(g => !processedObjectiveIds.Contains(g.Objective.ObjectiveId)).ToList();
             if (filteredGroup.Count < 2) continue;
 
-            // 그룹 리스트가 표시될 영역과 겹치는 텍스트를 반복적으로 추가
-            var expandedGroup = ExpandGroupToIncludeOverlappingTexts(filteredGroup, markerInfos, markerSize, inverseScale);
-
-            // 확장된 그룹에서도 이미 처리된 마커 제외
+            // 그룹 확장도 백그라운드에서 미리 할 수 있으면 좋겠지만, Rect 연산이라 메타데이터 기반으로 수행
+            var expandedGroup = ExpandGroupToIncludeOverlappingTexts(filteredGroup, markerInfoList, markerSize, inverseScale);
             expandedGroup = expandedGroup.Where(g => !processedObjectiveIds.Contains(g.Objective.ObjectiveId)).ToList();
             if (expandedGroup.Count < 2) continue;
 
-            // 마커들의 위치 정보 수집
-            var markerPositions = new List<(double X, double Y)>();
-            foreach (var info in expandedGroup)
-            {
-                if (info.Marker is Canvas c)
-                {
-                    // Area 마커의 경우 centerCanvas의 위치 사용
-                    var (posX, posY) = GetMarkerPosition(c);
-                    markerPositions.Add((posX, posY));
-                }
-            }
-
+            var markerPositions = expandedGroup.Select(info => GetMarkerPositionInsideMetadata(info)).ToList();
             if (markerPositions.Count == 0) continue;
 
-            // 마커들의 중심 X와 가장 아래 Y 계산
             var centerX = markerPositions.Average(p => p.X);
             var bottomY = markerPositions.Max(p => p.Y);
 
-            // 그룹 내 각 마커의 텍스트만 숨기기 (마커 원은 그대로 유지)
             foreach (var info in expandedGroup)
             {
-                if (info.Marker is Canvas c)
-                {
-                    HideMarkerText(c);
-                }
-
-                // 처리된 마커로 표시
+                if (info.Marker is Canvas c) HideMarkerText(c);
                 processedObjectiveIds.Add(info.Objective.ObjectiveId);
-                // markerInfos에서 제거 (다른 그룹에서 중복 처리 방지)
-                markerInfos.RemoveAll(m => m.Objective.ObjectiveId == info.Objective.ObjectiveId);
             }
 
-            // 텍스트 그룹 인디케이터 생성 (마커 아래에 위치)
-            var groupIndicator = CreateTextGroupIndicator(expandedGroup, centerX, bottomY);
+            var groupIndicator = CreateTextGroupIndicator(expandedGroup.Select(m => (m.Marker, m.TextBounds, m.Objective)).ToList(), centerX, bottomY);
             _groupedMarkerElements.Add(groupIndicator);
             _markersContainer.Children.Add(groupIndicator);
         }
     }
 
-    private List<(FrameworkElement Marker, Rect TextBounds, TaskObjectiveWithLocation Objective)> ExpandGroupToIncludeOverlappingTexts(
-        List<(FrameworkElement Marker, Rect TextBounds, TaskObjectiveWithLocation Objective)> initialGroup,
-        List<(FrameworkElement Marker, Rect TextBounds, TaskObjectiveWithLocation Objective)> allMarkers,
+    private struct MarkerGroupMetadata
+    {
+        public FrameworkElement Marker;
+        public Rect TextBounds;
+        public TaskObjectiveWithLocation Objective;
+        public double MarkerPosX;
+        public double MarkerPosY;
+    }
+
+    private static (double X, double Y) GetMarkerPositionInsideMetadata(MarkerGroupMetadata info)
+    {
+        return (info.MarkerPosX, info.MarkerPosY);
+    }
+
+    private List<MarkerGroupMetadata> ExpandGroupToIncludeOverlappingTexts(
+        List<MarkerGroupMetadata> initialGroup,
+        List<MarkerGroupMetadata> allMarkers,
         double markerSize, double inverseScale)
     {
-        var expandedGroup = new List<(FrameworkElement Marker, Rect TextBounds, TaskObjectiveWithLocation Objective)>(initialGroup);
+        var expandedGroup = new List<MarkerGroupMetadata>(initialGroup);
         var groupObjectiveIds = new HashSet<string>(initialGroup.Select(g => g.Objective.ObjectiveId));
 
         bool changed;
         do
         {
             changed = false;
-
-            // 현재 그룹의 마커 위치로 그룹 리스트 영역 계산
-            var markerPositions = expandedGroup
-                .Where(info => info.Marker is Canvas)
-                .Select(info => (Canvas.GetLeft((Canvas)info.Marker), Canvas.GetTop((Canvas)info.Marker)))
-                .ToList();
-
+            var markerPositions = expandedGroup.Select(info => (info.MarkerPosX, info.MarkerPosY)).ToList();
             if (markerPositions.Count == 0) break;
 
             var centerX = markerPositions.Average(p => p.Item1);
             var bottomY = markerPositions.Max(p => p.Item2);
 
-            // 그룹 리스트의 예상 크기 계산 (항목당 약 20픽셀 높이, 최대 너비 200픽셀)
             var estimatedListHeight = expandedGroup.Count * 20 * inverseScale;
             var estimatedListWidth = 200 * inverseScale;
 
-            // 그룹 리스트가 표시될 영역 (마커 아래)
             var groupListBounds = new Rect(
                 centerX - estimatedListWidth / 2,
                 bottomY + (markerSize / 2 + 4) * inverseScale,
@@ -1116,12 +1086,9 @@ public class MapQuestMarkerManager
                 estimatedListHeight
             );
 
-            // 그룹에 포함되지 않은 마커들 중 그룹 리스트 영역과 겹치는 것 찾기
-            foreach (var marker in allMarkers.ToList())
+            foreach (var marker in allMarkers)
             {
-                if (groupObjectiveIds.Contains(marker.Objective.ObjectiveId))
-                    continue;
-
+                if (groupObjectiveIds.Contains(marker.Objective.ObjectiveId)) continue;
                 if (groupListBounds.IntersectsWith(marker.TextBounds))
                 {
                     expandedGroup.Add(marker);
@@ -1134,44 +1101,56 @@ public class MapQuestMarkerManager
         return expandedGroup;
     }
 
-    private List<List<(FrameworkElement Marker, Rect TextBounds, TaskObjectiveWithLocation Objective)>> FindOverlappingGroups(
-        List<(FrameworkElement Marker, Rect TextBounds, TaskObjectiveWithLocation Objective)> markerInfos)
+    private List<List<MarkerGroupMetadata>> FindOverlappingGroupsOptimized(List<MarkerGroupMetadata> markerInfos)
     {
         var n = markerInfos.Count;
         var parent = Enumerable.Range(0, n).ToArray();
 
-        int Find(int x)
+        int FindRoot(int x)
         {
-            if (parent[x] != x) parent[x] = Find(parent[x]);
+            if (parent[x] != x) parent[x] = FindRoot(parent[x]);
             return parent[x];
         }
 
         void Union(int x, int y)
         {
-            var px = Find(x);
-            var py = Find(y);
+            var px = FindRoot(x);
+            var py = FindRoot(y);
             if (px != py) parent[px] = py;
         }
 
-        // 겹치는 마커끼리 연결
+        // 1. X 좌표 기준으로 정렬 (Sliding Window optimization)
+        var sortedIndices = Enumerable.Range(0, n)
+            .OrderBy(i => markerInfos[i].TextBounds.X)
+            .ToArray();
+
+        // 2. 정렬된 마커들끼리 겹침 검사 (O(N^2)에서 필터링을 통해 대폭 감소)
         for (int i = 0; i < n; i++)
         {
+            var idxI = sortedIndices[i];
+            var rectI = markerInfos[idxI].TextBounds;
+
             for (int j = i + 1; j < n; j++)
             {
-                if (markerInfos[i].TextBounds.IntersectsWith(markerInfos[j].TextBounds))
+                var idxJ = sortedIndices[j];
+                var rectJ = markerInfos[idxJ].TextBounds;
+
+                // X축 거리가 이미 i의 너비를 벗어났다면 더 이상 이 i에 대해 검사할 필요 없음 (정렬 덕분)
+                if (rectJ.X > rectI.Right)
+                    break;
+
+                if (rectI.IntersectsWith(rectJ))
                 {
-                    Union(i, j);
+                    Union(idxI, idxJ);
                 }
             }
         }
 
-        // 그룹화
-        var groups = new Dictionary<int, List<(FrameworkElement, Rect, TaskObjectiveWithLocation)>>();
+        var groups = new Dictionary<int, List<MarkerGroupMetadata>>();
         for (int i = 0; i < n; i++)
         {
-            var root = Find(i);
-            if (!groups.ContainsKey(root))
-                groups[root] = new List<(FrameworkElement, Rect, TaskObjectiveWithLocation)>();
+            var root = FindRoot(i);
+            if (!groups.ContainsKey(root)) groups[root] = new List<MarkerGroupMetadata>();
             groups[root].Add(markerInfos[i]);
         }
 

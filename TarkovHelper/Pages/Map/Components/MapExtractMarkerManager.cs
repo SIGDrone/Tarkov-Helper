@@ -114,12 +114,11 @@ public class MapExtractMarkerManager
         var extracts = _extractService.GetExtractsForMap(_currentMapKey, config);
 
         int count = 0;
-        // 모든 탈출구를 개별적으로 표시 (그룹화 없음)
         foreach (var extract in extracts)
         {
-            // [v1.1.37] UI 부하 분산
+            // [v1.1.37] UI 부하 분산 (더 빈번하게 양보)
             count++;
-            if (count % 20 == 0) await Task.Yield();
+            if (count % 10 == 0) await Task.Delay(1, ct);
 
             ct.ThrowIfCancellationRequested();
 

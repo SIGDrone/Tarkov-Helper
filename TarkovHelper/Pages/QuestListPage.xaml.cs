@@ -150,6 +150,7 @@ namespace TarkovHelper.Pages
                 ApplyFilters();
                 UpdateDetailPanel();
                 UpdateRecommendations();
+                UpdateKappaGauge();
             });
         }
 
@@ -614,9 +615,10 @@ namespace TarkovHelper.Pages
                 TxtKappaGauge.Text = $"{completed}/{total}";
                 KappaGaugeBar.Width = (percentage / 100.0) * 120; // 120 is the gauge width
             }
-            catch
+            catch (Exception ex)
             {
-                // QuestGraphService not initialized yet
+                // QuestGraphService not initialized yet or other error
+                System.Diagnostics.Debug.WriteLine($"[QuestListPage] UpdateKappaGauge failed: {ex.Message}");
                 TxtKappaGauge.Text = "0/0";
                 KappaGaugeBar.Width = 0;
             }
