@@ -107,7 +107,7 @@ public partial class MainWindow : Window
             
             try
             {
-                await DatabaseUpdateService.Instance.CheckAndUpdateAsync();
+                // await DatabaseUpdateService.Instance.CheckAndUpdateAsync();
             }
             finally
             {
@@ -416,7 +416,7 @@ public partial class MainWindow : Window
         dbUpdateService.DatabaseUpdated += OnDatabaseUpdated;
 
         // 백그라운드 업데이트 체크 시작 (5분마다)
-        dbUpdateService.StartBackgroundUpdates();
+        // dbUpdateService.StartBackgroundUpdates();
 
         _log.Info("Database update service started");
     }

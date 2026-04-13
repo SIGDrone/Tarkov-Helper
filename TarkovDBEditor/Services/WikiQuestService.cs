@@ -888,17 +888,47 @@ namespace TarkovDBEditor.Services
                 Description = CleanWikiMarkup(line)
             };
 
-            // 맵 이름 추출 - [[Customs]], [[Factory]], [[Shoreline]] 등
-            var mapNames = new[] { "Customs", "Factory", "Shoreline", "Interchange", "Reserve", "Woods", "Lighthouse", "Streets of Tarkov", "Ground Zero", "Lab", "The Lab" };
-            foreach (var mapName in mapNames)
+            // 맵 이름 추출 및 Canonical Key 매핑 (긴 명칭부터 우선 매핑하여 충돌 방지)
+            var mapMapping = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                if (Regex.IsMatch(line, $@"\[\[{Regex.Escape(mapName)}\]\]", RegexOptions.IgnoreCase) ||
-                    Regex.IsMatch(line, $@"\bon {Regex.Escape(mapName)}\b", RegexOptions.IgnoreCase))
+                { "The Labyrinth", "Labyrinth" },
+                { "Labyrinth", "Labyrinth" },
+                { "Streets of Tarkov", "StreetsOfTarkov" },
+                { "Streets", "StreetsOfTarkov" },
+                { "Ground Zero", "GroundZero" },
+                { "Sandbox", "GroundZero" },
+                { "The Lab", "Labs" },
+                { "Lab", "Labs" },
+                { "Labs", "Labs" },
+                { "Customs", "Customs" },
+                { "Factory", "Factory" },
+                { "Shoreline", "Shoreline" },
+                { "Interchange", "Interchange" },
+                { "Reserve", "Reserve" },
+                { "Woods", "Woods" },
+                { "Lighthouse", "Lighthouse" }
+            };
+
+            string detectedMap = null;
+            foreach (var kvp in mapMapping)
+            {
+                if (Regex.IsMatch(line, $@"\[\[{Regex.Escape(kvp.Key)}\]\]", RegexOptions.IgnoreCase) ||
+                    Regex.IsMatch(line, $@"\b{Regex.Escape(kvp.Key)}\b", RegexOptions.IgnoreCase))
                 {
-                    obj.MapName = mapName == "The Lab" ? "Lab" : mapName;
-                    break;
+                    // 이미 다른 맵이 감지되었는데 이번에 'Labs'가 감지된 경우, 'Labs'는 일반 명사(lab)일 확률이 높으므로 무시
+                    if (detectedMap != null && kvp.Value == "Labs")
+                        continue;
+
+                    detectedMap = kvp.Value;
+
+                    // 'Labs'가 아닌 특정 맵이 명시되었다면 해당 맵으로 확정 (ex: Streets of Tarkov 내의 lab)
+                    if (detectedMap != "Labs")
+                        break;
                 }
             }
+
+            if (detectedMap != null)
+                obj.MapName = detectedMap;
 
             // Found in Raid 체크
             // "found in raid" 또는 단순히 "in raid" (예: Find [[Item]] <font color="red">in raid</font>)
@@ -1107,8 +1137,8 @@ namespace TarkovDBEditor.Services
             if (itemMatch.Success)
             {
                 var itemName = itemMatch.Groups[1].Value.Trim();
-                // 맵 이름이 아니면 아이템으로 설정
-                if (!mapNames.Any(m => m.Equals(itemName, StringComparison.OrdinalIgnoreCase)))
+                // 맵 이름이 아니면 아이템으로 설정 (Wiki 명칭 또는 표준 Key 모두 체크)
+                if (!mapMapping.ContainsKey(itemName) && !mapMapping.Values.Contains(itemName))
                     obj.ItemName = itemName;
             }
 

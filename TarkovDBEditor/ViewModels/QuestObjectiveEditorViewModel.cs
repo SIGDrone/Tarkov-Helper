@@ -228,8 +228,11 @@ public class QuestObjectiveEditorViewModel : INotifyPropertyChanged
             FROM QuestObjectives o
             JOIN Quests q ON o.QuestId = q.Id
             WHERE o.MapName = @MapKey
-               OR (o.MapName IS NULL AND q.Location = @MapKey)
-               OR (o.MapName = '' AND q.Location = @MapKey)
+               OR ((o.MapName IS NULL OR o.MapName = '') 
+                   AND (q.Location = @MapKey 
+                        OR q.Location LIKE @MapKey + ', %' 
+                        OR q.Location LIKE '%, ' + @MapKey 
+                        OR q.Location LIKE '%, ' + @MapKey + ', %'))
             ORDER BY q.Name, o.SortOrder";
 
         await using var cmd = new SqliteCommand(sql, connection);

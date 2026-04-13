@@ -147,25 +147,8 @@ public sealed class DatabaseUpdateService : IDisposable
     /// </summary>
     public async Task<UpdateCheckResult> CheckAndUpdateAsync()
     {
-        // 이미 업데이트가 진행 중이면 해당 태스크를 반환하여 호출자가 기다릴 수 있게 함
-        if (_isUpdating && _currentUpdateTask != null)
-        {
-            _log.Debug("Update already in progress, joining existing task");
-            return await _currentUpdateTask;
-        }
-
-        _isUpdating = true;
-        _currentUpdateTask = DoCheckAndUpdateAsync();
-
-        try
-        {
-            return await _currentUpdateTask;
-        }
-        finally
-        {
-            _isUpdating = false;
-            _currentUpdateTask = null;
-        }
+        _log.Info("Update check disabled by user request");
+        return new UpdateCheckResult(true, false, "업데이트 기능이 비활성화되었습니다");
     }
 
     /// <summary>

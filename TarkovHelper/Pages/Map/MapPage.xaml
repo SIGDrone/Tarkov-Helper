@@ -68,6 +68,8 @@
                             Margin="0,0,8,0" Click="BtnClearTrail_Click"/>
                     <Button x:Name="BtnFullScreen" Content="전체 화면" Padding="12,6"
                             Margin="0,0,8,0" Click="BtnFullScreen_Click"/>
+                    <Button x:Name="BtnMinimap" Content="미니맵" Padding="12,6"
+                            Margin="0,0,8,0" Click="BtnMinimap_Click"/>
                     <Button x:Name="BtnSettings" Content="설정" Padding="12,6"
                             Click="BtnSettings_Click"/>
                 </StackPanel>
@@ -654,7 +656,7 @@
             </Border>
 
             <!-- 설정 패널 (토글 가능) -->
-            <Border x:Name="SettingsPanel" Grid.Column="3"
+            <Border x:Name="SettingsPanel" Grid.Column="5"
                     Background="{StaticResource BackgroundMediumBrush}"
                     BorderBrush="{StaticResource BorderBrush}" BorderThickness="1,1,0,0"
                     Visibility="Collapsed">
@@ -672,7 +674,8 @@
                         <!-- 스크린샷 폴더 설정 -->
                         <TextBlock x:Name="TxtScreenshotFolderLabel" Text="스크린샷 폴더" FontWeight="SemiBold"
                                    Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,8"/>
-                        <TextBox x:Name="TxtScreenshotFolder" IsReadOnly="True" Margin="0,0,0,8"/>
+                        <TextBox x:Name="TxtScreenshotFolder" IsReadOnly="True" Margin="0,0,0,8"
+                                 TextWrapping="Wrap"/>
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,24">
                             <Button x:Name="BtnAutoDetect" Content="자동 감지" Padding="12,6"
                                     Margin="0,0,8,0" Click="BtnAutoDetect_Click"/>

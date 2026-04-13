@@ -109,6 +109,7 @@ public partial class MapPage : UserControl
     private MapCustomMarkerManager? _customMarkerManager;
     private Point _lastRightClickPosition;
     private CancellationTokenSource? _loadingCts;
+    private bool _isInitializing;
 
     public MapPage()
     {
@@ -235,6 +236,13 @@ public partial class MapPage : UserControl
 
     private CancellationToken GetNewCancellationToken()
     {
+        // 초기화 중에는 기존 토큰을 취소하지 않고 현재 토큰을 반환합니다.
+        // RestoreMapState()에 의해 유발된 이벤트 핸들러가 메인 로딩 루틴을 취소하는 것을 방지합니다.
+        if (_isInitializing && _loadingCts != null)
+        {
+            return _loadingCts.Token;
+        }
+
         _loadingCts?.Cancel();
         _loadingCts?.Dispose();
         _loadingCts = new CancellationTokenSource();
@@ -245,7 +253,14 @@ public partial class MapPage : UserControl
     {
         try
         {
-            var ct = GetNewCancellationToken();
+            // 초기화 시작 (GetNewCancellationToken이 기존 작업을 취소하도록 하되, 
+            // 이후 RestoreMapState 등이 이 토큰을 취소하지 못하게 함)
+            _loadingCts?.Cancel();
+            _loadingCts?.Dispose();
+            _loadingCts = new CancellationTokenSource();
+            var ct = _loadingCts.Token;
+
+            _isInitializing = true;
 
             // 페이지 로드 시 Trail 초기화
             _trackerService?.ClearTrail();
@@ -298,6 +313,10 @@ public partial class MapPage : UserControl
             // 오버레이 미니맵 서비스 초기화
             await InitializeOverlayServiceAsync().WaitAsync(ct);
 
+            // 오버레이 가시성 변경 이벤트 구독
+            _overlayService.OverlayVisibilityChanged += OnOverlayVisibilityChanged;
+            UpdateMinimapButtonState(_overlayService.IsOverlayVisible);
+
             // 자동 Tracking 시작 (Map 탭 활성화 시)
             StartAutoTracking();
         }
@@ -315,6 +334,10 @@ public partial class MapPage : UserControl
 
             _log.Error("Critical error loading map page", ex);
             MessageBox.Show($"지도 추적 페이지 로드 오류: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            _isInitializing = false;
         }
     }
 
@@ -335,6 +358,9 @@ public partial class MapPage : UserControl
         // Global Keyboard Hook 중지
         GlobalKeyboardHookService.Instance.FloorKeyPressed -= OnFloorKeyPressed;
         GlobalKeyboardHookService.Instance.IsEnabled = false;
+
+        // 오버레이 가시성 변경 이벤트 구독 해제
+        _overlayService.OverlayVisibilityChanged -= OnOverlayVisibilityChanged;
 
         // 오버레이 숨기기 (Map 탭 이탈 시)
         _overlayService.HideOverlay();
@@ -420,6 +446,7 @@ public partial class MapPage : UserControl
         BtnClearTrail.Content = _loc.ClearTrail;
         BtnFullScreen.Content = _loc.FullScreen;
         BtnExitFullScreen.Content = _loc.ExitFullScreen;
+        BtnMinimap.Content = _loc.Minimap;
         BtnSettings.Content = _loc.Settings;
         MenuAddCustomMarker.Header = _loc.AddCustomMarker;
 
@@ -1090,6 +1117,34 @@ public partial class MapPage : UserControl
         ToggleSettingsPanel(true);
     }
 
+    private void BtnMinimap_Click(object sender, RoutedEventArgs e)
+    {
+        _overlayService.ToggleOverlay();
+    }
+
+    private void OnOverlayVisibilityChanged(bool isVisible)
+    {
+        Dispatcher.Invoke(() => UpdateMinimapButtonState(isVisible));
+    }
+
+    private void UpdateMinimapButtonState(bool isVisible)
+    {
+        if (BtnMinimap == null) return;
+
+        if (isVisible)
+        {
+            // 강조색 적용 (AccentBrush)
+            BtnMinimap.Background = TryFindResource("AccentBrush") as Brush ?? Brushes.RoyalBlue;
+            BtnMinimap.Foreground = Brushes.White;
+        }
+        else
+        {
+            // 기본 스타일로 복구 (버튼 기본 배경색이 없으면 투명 또는 기본 브러시)
+            BtnMinimap.ClearValue(Button.BackgroundProperty);
+            BtnMinimap.ClearValue(Button.ForegroundProperty);
+        }
+    }
+
     private void BtnCloseSettings_Click(object sender, RoutedEventArgs e)
     {
         ToggleSettingsPanel(false);
@@ -1119,6 +1174,17 @@ public partial class MapPage : UserControl
                 var ct = GetNewCancellationToken();
                 _currentMapKey = mapKey;
                 _trackerService?.SetCurrentMap(mapKey);
+
+                // 줌 초기화 및 위치 리셋 (새 지도가 튀는 현상 방지)
+                SetZoom(1.0);
+                MapTranslate.X = 0;
+                MapTranslate.Y = 0;
+
+                // 패널이 열려있으면 즉시 내용 갱신 (비동기 작업 대기 없이 실시간성 보장)
+                if (QuestDrawerPanel?.Visibility == Visibility.Visible)
+                {
+                    RefreshQuestDrawer();
+                }
 
                 // 맵 변경 시 Trail 초기화
                 _trackerService?.ClearTrail();
@@ -1155,12 +1221,6 @@ public partial class MapPage : UserControl
                 if (_customMarkerManager != null)
                 {
                     await _customMarkerManager.RefreshMarkersAsync(ct);
-                }
-
-                // 패널이 열려있으면 내용 갱신 (닫지 않음)
-                if (QuestDrawerPanel?.Visibility == Visibility.Visible)
-                {
-                    RefreshQuestDrawer();
                 }
             }
             catch (OperationCanceledException)
@@ -1236,45 +1296,56 @@ public partial class MapPage : UserControl
         var config = _trackerService?.GetMapConfig(mapKey);
         var floors = config?.Floors;
 
-        CmbFloorSelect.Items.Clear();
-        _currentFloorId = null;
+        // 이벤트 중복 방지를 위해 일시 해제
+        CmbFloorSelect.SelectionChanged -= CmbFloorSelect_SelectionChanged;
 
-        if (floors == null || floors.Count == 0)
+        try
         {
-            // 단일 층 맵: 층 선택 UI 숨김
-            TxtFloorLabel.Visibility = Visibility.Collapsed;
-            CmbFloorSelect.Visibility = Visibility.Collapsed;
-            return;
-        }
+            CmbFloorSelect.Items.Clear();
+            _currentFloorId = null;
 
-        // 다층 맵: 층 선택 UI 표시
-        TxtFloorLabel.Visibility = Visibility.Visible;
-        CmbFloorSelect.Visibility = Visibility.Visible;
-
-        // 층 목록을 Order 순으로 정렬하여 추가
-        var sortedFloors = floors.OrderBy(f => f.Order).ToList();
-        int defaultIndex = 0;
-
-        for (int i = 0; i < sortedFloors.Count; i++)
-        {
-            var floor = sortedFloors[i];
-            CmbFloorSelect.Items.Add(new ComboBoxItem
+            if (floors == null || floors.Count == 0)
             {
-                Content = floor.DisplayName,
-                Tag = floor.LayerId
-            });
+                // 단일 층 맵: 층 선택 UI 숨김
+                TxtFloorLabel.Visibility = Visibility.Collapsed;
+                CmbFloorSelect.Visibility = Visibility.Collapsed;
+                return;
+            }
 
-            if (floor.IsDefault)
+            // 다층 맵: 층 선택 UI 표시
+            TxtFloorLabel.Visibility = Visibility.Visible;
+            CmbFloorSelect.Visibility = Visibility.Visible;
+
+            // 층 목록을 Order 순으로 정렬하여 추가
+            var sortedFloors = floors.OrderBy(f => f.Order).ToList();
+            int defaultIndex = 0;
+
+            for (int i = 0; i < sortedFloors.Count; i++)
             {
-                defaultIndex = i;
+                var floor = sortedFloors[i];
+                CmbFloorSelect.Items.Add(new ComboBoxItem
+                {
+                    Content = floor.DisplayName,
+                    Tag = floor.LayerId
+                });
+
+                if (floor.IsDefault)
+                {
+                    defaultIndex = i;
+                }
+            }
+
+            // 기본 층 선택
+            if (CmbFloorSelect.Items.Count > 0)
+            {
+                CmbFloorSelect.SelectedIndex = defaultIndex;
+                _currentFloorId = sortedFloors[defaultIndex].LayerId;
             }
         }
-
-        // 기본 층 선택
-        if (CmbFloorSelect.Items.Count > 0)
+        finally
         {
-            CmbFloorSelect.SelectedIndex = defaultIndex;
-            _currentFloorId = sortedFloors[defaultIndex].LayerId;
+            // 이벤트 재연결
+            CmbFloorSelect.SelectionChanged += CmbFloorSelect_SelectionChanged;
         }
     }
 
@@ -1716,11 +1787,11 @@ public partial class MapPage : UserControl
             return;
         }
 
-        // 줌 레벨을 고려하여 중앙 위치 계산
+        // 현재 줌과 맵 크기를 고려한 실제 맵 크기
         var scaledMapWidth = mapWidth * _zoomLevel;
         var scaledMapHeight = mapHeight * _zoomLevel;
 
-        // 맵을 뷰어 중앙에 배치하기 위한 이동량 계산
+        // 맵을 화면 중앙에 배치하기 위한 이동 좌표 계산
         var translateX = (viewerWidth - scaledMapWidth) / 2;
         var translateY = (viewerHeight - scaledMapHeight) / 2;
 
@@ -3092,34 +3163,29 @@ public partial class MapPage : UserControl
         var processedQuestIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var allObjectivesForDrawer = new List<TaskObjectiveWithLocation>();
 
-        foreach (var obj in _currentMapObjectives)
+        // 1. 모든 활성 퀘스트 가져오기
+        var activeTasks = _progressService.AllTasks
+            .Where(t => _progressService.GetStatus(t) == QuestStatus.Active)
+            .ToList();
+
+        foreach (var task in activeTasks)
         {
-            // 이 퀘스트의 다른 맵 목표도 가져오기 (QuestId 기반)
-            if (!processedQuestIds.Contains(obj.QuestId))
+            var taskId = task.Ids?.FirstOrDefault();
+            if (string.IsNullOrEmpty(taskId)) continue;
+
+            if (!processedQuestIds.Contains(taskId))
             {
-                processedQuestIds.Add(obj.QuestId);
+                processedQuestIds.Add(taskId);
 
                 // 이 퀘스트의 모든 목표 가져오기 (QuestId 기반)
-                var allTaskObjectives = _objectiveService.GetObjectivesForTaskById(obj.QuestId);
+                var allTaskObjectives = _objectiveService.GetObjectivesForTaskById(taskId);
 
                 foreach (var taskObj in allTaskObjectives)
                 {
-                    // 퀘스트 상태 확인 (ID 기반 조회 우선, NormalizedName은 fallback)
-                    var task = _progressService.GetTaskById(taskObj.QuestId)
-                        ?? _progressService.GetTask(taskObj.TaskNormalizedName);
-
-                    if (task == null)
-                        continue;
-
-                    var status = _progressService.GetStatus(task);
-
-                    if (status == QuestStatus.Active)
-                    {
-                        // 목표 인덱스 및 완료 상태 설정
-                        taskObj.ObjectiveIndex = GetObjectiveIndex(task, taskObj.Description);
-                        taskObj.IsCompleted = ObjectiveProgressService.Instance.IsObjectiveCompletedById(taskObj.ObjectiveId);
-                        allObjectivesForDrawer.Add(taskObj);
-                    }
+                    // 목표 인덱스 및 완료 상태 설정
+                    taskObj.ObjectiveIndex = GetObjectiveIndex(task, taskObj.Description);
+                    taskObj.IsCompleted = ObjectiveProgressService.Instance.IsObjectiveCompletedById(taskObj.ObjectiveId);
+                    allObjectivesForDrawer.Add(taskObj);
                 }
             }
         }

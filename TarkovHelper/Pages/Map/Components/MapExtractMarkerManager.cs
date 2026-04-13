@@ -16,6 +16,8 @@ namespace TarkovHelper.Pages.Map.Components;
 /// </summary>
 public class MapExtractMarkerManager
 {
+    private static readonly Services.Logging.ILogger _log = Services.Logging.Log.For<MapExtractMarkerManager>();
+
     // 의존성 서비스
     private readonly Canvas _markersContainer;
     private readonly MapTrackerService _trackerService;
@@ -114,6 +116,10 @@ public class MapExtractMarkerManager
         var extracts = _extractService.GetExtractsForMap(_currentMapKey, config);
 
         int count = 0;
+        int pmcCount = 0;
+        int scavCount = 0;
+        int sharedCount = 0;
+
         foreach (var extract in extracts)
         {
             // [v1.1.37] UI 부하 분산 (더 빈번하게 양보)
@@ -122,8 +128,14 @@ public class MapExtractMarkerManager
 
             ct.ThrowIfCancellationRequested();
 
+            if (extract == null) continue;
+
             // 진영 필터 적용
             if (!ShouldShowExtract(extract.Faction)) continue;
+
+            if (extract.Faction == ExtractFaction.Pmc) pmcCount++;
+            else if (extract.Faction == ExtractFaction.Scav) scavCount++;
+            else if (extract.Faction == ExtractFaction.Shared) sharedCount++;
 
             // TarkovDBEditor 방식: config.GameToScreenForPlayer 사용
             var (screenX, screenY) = config.GameToScreenForPlayer(extract.X, extract.Z);
@@ -142,6 +154,8 @@ public class MapExtractMarkerManager
             _extractMarkerElements.Add(marker);
             _markersContainer.Children.Add(marker);
         }
+
+        _log.Info($"Refreshed {extracts.Count} extracts for {_currentMapKey} (PMC: {pmcCount}, Scav: {scavCount}, Shared: {sharedCount})");
     }
 
     public void ClearMarkers()
@@ -444,7 +458,7 @@ public class MapExtractMarkerManager
         { 
             ExtractFaction.Pmc => _showPmcExtracts,
             ExtractFaction.Scav => _showScavExtracts,
-            ExtractFaction.Shared => _showPmcExtracts, // Shared도 PMC 필터 사용
+            ExtractFaction.Shared => _showPmcExtracts || _showScavExtracts, // Shared는 어느 한쪽만 켜져있어도 표시
             ExtractFaction.Transit => _showTransitExtracts,
             _ => true
         };
@@ -459,7 +473,10 @@ public class MapExtractMarkerManager
         // 마커에 층 정보가 없는 경우: 기본 층(main)으로 간주
         if (string.IsNullOrEmpty(markerFloorId))
         { 
-            // 현재 선택된 층이 main이면 표시, 아니면 다른 층으로 처리
+            // 층 정보가 없는 마커는 기본적으로 모든 층에서 표시 (지하 맵 제외)
+            if (string.IsNullOrEmpty(_currentFloorId)) return true;
+            
+            // 현재 맵에 층이 정의되어 있는데 마커에 층이 없으면, main 층일 때만 강조 표시
             return string.Equals(_currentFloorId, "main", StringComparison.OrdinalIgnoreCase);
         }
 

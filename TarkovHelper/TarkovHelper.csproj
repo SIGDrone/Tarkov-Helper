@@ -1,5 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
@@ -7,62 +6,53 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
-
     <!-- Version Info for Auto-Update -->
-    <Version>1.2.0</Version>
-    <AssemblyVersion>1.2.0</AssemblyVersion>
-    <FileVersion>1.2.0</FileVersion>
-
-
-
+    <Version>1.3.0</Version>
+    <AssemblyVersion>1.3.0</AssemblyVersion>
+    <FileVersion>1.3.0</FileVersion>
     <ApplicationIcon>1764579946.ico</ApplicationIcon>
-
-    <!-- AutoUpdater.NET 다국어 리소스 제한 (ko만 유지) -->
+    <!-- AutoUpdater.NET ????????????癲??????????????무???????關?쒎첎?嫄??怨몃룶????????????(ko?????) -->
     <SatelliteResourceLanguages>ko</SatelliteResourceLanguages>
-
     <!-- Run as Administrator -->
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
-
   <ItemGroup>
     <Content Include="1764579946.ico" />
   </ItemGroup>
-
   <ItemGroup>
     <Content Include="Fonts\*.ttf;Fonts\*.otf" ExcludeFromSingleFile="true">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-
-
-    <None Update="Assets\Maps\*.svg">
+    <Content Include="Assets\Maps\*.svg" ExcludeFromSingleFile="true">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="Assets\tarkov_data.db">
+    </Content>
+    <Content Include="Assets\tarkov_data.db" ExcludeFromSingleFile="true">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="Assets\icons\*.png">
+    </Content>
+    <Content Include="Assets\Icons\*.png" ExcludeFromSingleFile="true">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+    </Content>
+    <Content Include="Assets\db_version.txt" ExcludeFromSingleFile="true">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Resource Include="Assets\DB\Icons\*.webp" />
-    <None Update="Assets\DB\Icons\*.svg">
+    <Content Include="Assets\DB\Icons\*.svg" ExcludeFromSingleFile="true">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="Assets\DB\Icons\Markers\*.svg">
+    </Content>
+    <Content Include="Assets\DB\Icons\Markers\*.svg" ExcludeFromSingleFile="true">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="Assets\DB\Maps\*.svg">
+    </Content>
+    <Content Include="Assets\DB\Maps\*.svg" ExcludeFromSingleFile="true">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="Assets\DB\Data\*.json">
+    </Content>
+    <Content Include="Assets\DB\Data\*.json" ExcludeFromSingleFile="true">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+    </Content>
   </ItemGroup>
-
   <ItemGroup>
     <PackageReference Include="Autoupdater.NET.Official" Version="1.9.2" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.11" />
     <PackageReference Include="SharpVectors.Wpf" Version="1.8.5" />
     <PackageReference Include="Westermo.GraphX.Controls" Version="3.0.1" />
   </ItemGroup>
-
 </Project>
