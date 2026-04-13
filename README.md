@@ -113,6 +113,8 @@ Escape from Tarkov 퀘스트 및 은신처 진행 상황을 추적하는 Windows
 - `hideouts.json` - API에서 받은 은신처 데이터 캐시
 - `app_settings.json` - 앱 설정 및 사용자 환경 설정
 
+"본 프로그램의 사용으로 인해 발생하는 모든 책임은 사용자 본인에게 있으며, 개발자(또는 제작사)는 어떠한 법적 책임도 지지 않습니다."
+
 ## 라이선스
 
 MIT License
