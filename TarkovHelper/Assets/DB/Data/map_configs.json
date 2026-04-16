@@ -458,7 +458,7 @@
       ],
       "playerMarkerTransform": [
         0.0159,
-        9.8630,
+        9.863,
         9.8655,
         0.0502,
         1482.9,
@@ -469,6 +469,31 @@
         162,
         -150,
         184
+      ]
+    },
+    {
+      "key": "Terminal",
+      "displayName": "Terminal",
+      "svgFileName": "Terminal.svg",
+      "imageWidth": 2663,
+      "imageHeight": 3132,
+      "aliases": [
+        "terminal",
+        "TERMINAL"
+      ],
+      "playerMarkerTransform": [
+        -0.992,
+        0,
+        0,
+        0.994,
+        1346.0,
+        1615.5
+      ],
+      "svgBounds": [
+        1357.0,
+        -1328.0,
+        -1625.0,
+        1526.0
       ]
     }
   ]

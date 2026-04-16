@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:svgc="http://sharpvectors.codeplex.com/svgc/"
         mc:Ignorable="d"
-        Title="Tarkov Helper"
+        Title="WidgetOverlay"
         Width="300" Height="300"
         MinWidth="100" MinHeight="100"
         MaxWidth="800" MaxHeight="800"

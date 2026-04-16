@@ -149,6 +149,7 @@ public partial class LocalizationService : INotifyPropertyChanged
         "ground zero" or "groundzero" => "그라운드 제로",
         "the lab" or "the labs" or "labs" => "연구소",
         "the labyrinth" or "labyrinth" => "미궁",
+        "terminal" => "터미널",
         "arena" => "아레나",
         _ => englishName ?? Unknown
     };
