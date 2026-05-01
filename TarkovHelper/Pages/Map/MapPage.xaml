@@ -68,8 +68,6 @@
                             Margin="0,0,8,0" Click="BtnClearTrail_Click"/>
                     <Button x:Name="BtnFullScreen" Content="전체 화면" Padding="12,6"
                             Margin="0,0,8,0" Click="BtnFullScreen_Click"/>
-                    <Button x:Name="BtnMinimap" Content="미니맵" Padding="12,6"
-                            Margin="0,0,8,0" Click="BtnMinimap_Click"/>
                     <Button x:Name="BtnSettings" Content="설정" Padding="12,6"
                             Click="BtnSettings_Click"/>
                 </StackPanel>
@@ -427,26 +425,61 @@
                             <MenuItem x:Name="MenuAddCustomMarker" Header="마커 추가" Click="MenuAddCustomMarker_Click"/>
                         </ContextMenu>
                     </Grid.ContextMenu>
-                    <!-- 줌 컨트롤 -->
+                    <!-- 우측 상단 맵 컨트롤 -->
                     <Border HorizontalAlignment="Right" VerticalAlignment="Top"
                             Margin="0,8,24,0" Panel.ZIndex="100"
                             Background="{StaticResource BackgroundMediumBrush}"
                             CornerRadius="4" Padding="8,4">
                         <StackPanel Orientation="Horizontal">
-                            <Button Content="-" Width="28" Height="28" Padding="0"
-                                    Click="BtnZoomOut_Click" Margin="0,0,4,0"/>
-                            <ComboBox x:Name="CmbZoomLevel" Width="80"
-                                      SelectionChanged="CmbZoomLevel_SelectionChanged"
-                                      KeyDown="CmbZoomLevel_KeyDown"
-                                      IsEditable="True"
-                                      SelectedIndex="3"/>
-                            <Button Content="+" Width="28" Height="28" Padding="0"
-                                    Click="BtnZoomIn_Click" Margin="4,0,4,0"/>
-                            <Button x:Name="BtnResetView" Content="초기화" Padding="8,4"
-                                    Click="BtnResetView_Click" Margin="4,0,0,0"/>
+                            <!-- 기존 줌 컨트롤 (숨김 처리) -->
+                            <Button Content="-" Width="28" Height="28" Padding="0" Click="BtnZoomOut_Click" Margin="0,0,4,0" Visibility="Collapsed"/>
+                            <ComboBox x:Name="CmbZoomLevel" Width="80" SelectionChanged="CmbZoomLevel_SelectionChanged" KeyDown="CmbZoomLevel_KeyDown" IsEditable="True" SelectedIndex="3" Visibility="Collapsed"/>
+                            <Button Content="+" Width="28" Height="28" Padding="0" Click="BtnZoomIn_Click" Margin="4,0,4,0" Visibility="Collapsed"/>
+                            <Button x:Name="BtnResetView" Content="초기화" Padding="8,4" Click="BtnResetView_Click" Margin="4,0,0,0" Visibility="Collapsed"/>
+
+                            <!-- 미니맵 컨트롤 -->
+                            <Button x:Name="BtnMinimap" Content="미니맵" Padding="12,6"
+                                    Margin="0,0,4,0" Click="BtnMinimap_Click"/>
+                            <Button x:Name="BtnMinimapHelp" Content="?" Width="20" Height="20" Padding="0" Margin="0,0,4,0"
+                                    Background="Transparent" BorderBrush="{StaticResource TextSecondaryBrush}" BorderThickness="1"
+                                    Foreground="{StaticResource TextSecondaryBrush}" Cursor="Help" VerticalAlignment="Center">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{TemplateBinding Background}"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                CornerRadius="10">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-1,0,0"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Button.Template>
+                                <Button.ToolTip>
+                                    <ToolTip MaxWidth="350" Background="{StaticResource BackgroundMediumBrush}" BorderBrush="{StaticResource BorderBrush}" Foreground="{StaticResource TextPrimaryBrush}">
+                                        <TextBlock TextWrapping="Wrap" LineHeight="18">
+                                            <Run Text="[오버레이 미니맵 사용법]" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
+                                            <LineBreak/>
+                                            <Run Text="• 기본 기능:" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                            <LineBreak/>
+                                            <Run Text="  - 타르코프 게임 화면 위에 미니맵을 항상 띄워둡니다." Foreground="{StaticResource TextSecondaryBrush}"/>
+                                            <LineBreak/>
+                                            <Run Text="  - 창의 아무 곳이나 드래그하여 위치를 이동할 수 있습니다." Foreground="{StaticResource TextSecondaryBrush}"/>
+                                            <LineBreak/>
+                                            <Run Text="  - 우측 하단 모서리를 드래그하여 창 크기를 조절합니다." Foreground="{StaticResource TextSecondaryBrush}"/>
+                                            <LineBreak/>
+                                            <LineBreak/>
+                                            <Run Text="[단축키 안내]" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
+                                            <LineBreak/>
+                                            <Run Text="• " Foreground="{StaticResource TextSecondaryBrush}"/><Run Text="NumPad +" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/><Run Text=" / " Foreground="{StaticResource TextSecondaryBrush}"/><Run Text="NumPad -" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/><Run Text=" : 미니맵 확대 / 축소" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                            <LineBreak/>
+                                            <Run Text="• " Foreground="{StaticResource TextSecondaryBrush}"/><Run Text="Ctrl + L" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/><Run Text=" : 미니맵 설정 창 열기" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                        </TextBlock>
+                                    </ToolTip>
+                                </Button.ToolTip>
+                            </Button>
+
                             <!-- Exit Full Screen 버튼 (전체화면 모드에서만 표시) -->
                             <Button x:Name="BtnExitFullScreen" Content="전체 화면 종료" Padding="8,4"
-                                    Click="BtnExitFullScreen_Click" Margin="8,0,0,0"
+                                    Click="BtnExitFullScreen_Click" Margin="4,0,0,0"
                                     Visibility="Collapsed"/>
                         </StackPanel>
                     </Border>

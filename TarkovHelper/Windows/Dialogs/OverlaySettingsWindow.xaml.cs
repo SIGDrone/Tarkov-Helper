@@ -33,20 +33,12 @@ public partial class OverlaySettingsWindow : Window
     {
         SliderOpacity.Value = _settings.Opacity * 100;
         SliderZoom.Value = _settings.ZoomLevel * 100;
+        SliderMarkerSize.Value = _settings.PlayerMarkerSize * 100;
 
         RbFixed.IsChecked = _settings.ViewMode == MiniMapViewMode.Fixed;
         RbTracking.IsChecked = _settings.ViewMode == MiniMapViewMode.PlayerTracking;
 
-        ChkQuestMarkers.IsChecked = _settings.ShowQuestMarkers;
-        ChkExtractMarkers.IsChecked = _settings.ShowExtractMarkers;
         ChkClickThrough.IsChecked = _settings.ClickThrough;
-
-        // SettingsService에서 MapPage와 동기화되는 설정 로드
-        var settingsService = SettingsService.Instance;
-        ChkShowPmcExtracts.IsChecked = settingsService.MapShowPmcExtracts;
-        ChkShowScavExtracts.IsChecked = settingsService.MapShowScavExtracts;
-        ChkShowTransitExtracts.IsChecked = settingsService.MapShowTransits;
-        ChkHideCompletedObjectives.IsChecked = settingsService.MapHideCompletedObjectives;
 
         UpdateDisplays();
     }
@@ -57,6 +49,8 @@ public partial class OverlaySettingsWindow : Window
             TxtOpacity.Text = $"{(int)SliderOpacity.Value}%";
         if (TxtZoom != null)
             TxtZoom.Text = $"{SliderZoom.Value / 100:F2}x";
+        if (TxtMarkerSize != null)
+            TxtMarkerSize.Text = $"{SliderMarkerSize.Value / 100:F1}x";
     }
 
     private void ApplySettings()
@@ -65,9 +59,9 @@ public partial class OverlaySettingsWindow : Window
 
         _settings.Opacity = SliderOpacity.Value / 100.0;
         _settings.ZoomLevel = SliderZoom.Value / 100.0;
+        _settings.PlayerMarkerSize = SliderMarkerSize.Value / 100.0;
         _settings.ViewMode = RbTracking.IsChecked == true ? MiniMapViewMode.PlayerTracking : MiniMapViewMode.Fixed;
-        _settings.ShowQuestMarkers = ChkQuestMarkers.IsChecked == true;
-        _settings.ShowExtractMarkers = ChkExtractMarkers.IsChecked == true;
+
         _settings.ClickThrough = ChkClickThrough.IsChecked == true;
 
         SettingsApplied?.Invoke(_settings);
@@ -80,13 +74,14 @@ public partial class OverlaySettingsWindow : Window
     {
         if (_overlayWindow == null) return;
 
-        // Update opacity directly
+        // Update opacity directly and update zoom/center
         _overlayWindow.Dispatcher.Invoke(() =>
         {
             if (_overlayWindow.FindName("MainBorder") is System.Windows.Controls.Border border)
             {
                 border.Opacity = _settings.Opacity;
             }
+            _overlayWindow.SetZoomLevel(_settings.ZoomLevel);
         });
     }
 
@@ -104,46 +99,23 @@ public partial class OverlaySettingsWindow : Window
         ApplySettings();
     }
 
+    private void SliderMarkerSize_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        UpdateDisplays();
+        ApplySettings();
+    }
+
     private void ViewMode_Changed(object sender, RoutedEventArgs e)
     {
         ApplySettings();
     }
 
-    private void Marker_Changed(object sender, RoutedEventArgs e)
-    {
-        ApplySettings();
-        _overlayWindow?.RefreshMap();
-    }
+
 
     private void ClickThrough_Changed(object sender, RoutedEventArgs e)
     {
         ApplySettings();
         _overlayWindow?.ToggleClickThrough();
-    }
-
-    private void ExtractFilter_Changed(object sender, RoutedEventArgs e)
-    {
-        if (_isInitializing) return;
-
-        // SettingsService에 저장 (MapPage와 동기화)
-        var settingsService = SettingsService.Instance;
-        settingsService.MapShowPmcExtracts = ChkShowPmcExtracts.IsChecked == true;
-        settingsService.MapShowScavExtracts = ChkShowScavExtracts.IsChecked == true;
-        settingsService.MapShowTransits = ChkShowTransitExtracts.IsChecked == true;
-
-        // 오버레이 맵 새로고침
-        _overlayWindow?.RefreshMap();
-    }
-
-    private void HideCompleted_Changed(object sender, RoutedEventArgs e)
-    {
-        if (_isInitializing) return;
-
-        // SettingsService에 저장 (MapPage와 동기화)
-        SettingsService.Instance.MapHideCompletedObjectives = ChkHideCompletedObjectives.IsChecked == true;
-
-        // 오버레이 맵 새로고침
-        _overlayWindow?.RefreshMap();
     }
 
     private void BtnCenterPlayer_Click(object sender, RoutedEventArgs e)

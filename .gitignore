@@ -146,3 +146,6 @@ logs/
 BuildOutput/
 Build_Final/
 release_v*/
+
+# Scripts
+publish.ps1

@@ -368,21 +368,10 @@ public partial class OverlayMiniMapWindow : Window
 
         try
         {
-            _log.Info($"LoadMarkersAsync START: map={_currentMapKey}, ShowExtract={_settings.ShowExtractMarkers}, ShowQuest={_settings.ShowQuestMarkers}");
-
-            // 탈출구 마커 로드
-            if (_settings.ShowExtractMarkers)
-            {
-                await LoadExtractMarkersAsync();
-            }
-
-            // 퀘스트 마커는 일단 비활성화 (사용자 요청)
-            // if (_settings.ShowQuestMarkers)
-            // {
-            //     await LoadQuestMarkersAsync();
-            // }
-
-            _log.Info($"LoadMarkersAsync DONE: Extract={ExtractMarkersContainer.Children.Count}, Quest={QuestMarkersContainer.Children.Count}");
+            _log.Info($"LoadMarkersAsync: MiniMap only shows player marker. Skipping extract and quest markers.");
+            
+            // 미니맵에서는 플레이어 마커만 표시하도록 모든 다른 마커 로드 로직 제거/비활성화
+            await Task.CompletedTask;
         }
         catch (Exception ex)
         {
@@ -569,7 +558,7 @@ public partial class OverlayMiniMapWindow : Window
         }
     }
 
-    private void UpdateMapView()
+    public void UpdateMapView()
     {
         if (_currentMapConfig == null)
         {
@@ -580,6 +569,14 @@ public partial class OverlayMiniMapWindow : Window
         var zoom = _settings.ZoomLevel;
         MapScale.ScaleX = zoom;
         MapScale.ScaleY = zoom;
+
+        // 플레이어 마커 크기 적용
+        var markerSize = _settings.PlayerMarkerSize;
+        if (PlayerMarkerScale != null)
+        {
+            PlayerMarkerScale.ScaleX = markerSize;
+            PlayerMarkerScale.ScaleY = markerSize;
+        }
 
         // 바운더리 제한 적용 후 오프셋 설정
         var (clampedX, clampedY) = ClampMapOffset(_settings.MapOffsetX, _settings.MapOffsetY);
@@ -767,25 +764,25 @@ public partial class OverlayMiniMapWindow : Window
 
     public void ZoomIn()
     {
-        ZoomAroundCenter(true);
+        _settings.ZoomIn();
+        SetZoomLevel(_settings.ZoomLevel);
     }
 
     public void ZoomOut()
     {
-        ZoomAroundCenter(false);
+        _settings.ZoomOut();
+        SetZoomLevel(_settings.ZoomLevel);
     }
 
     /// <summary>
-    /// 화면 중앙을 기준으로 줌인/줌아웃합니다.
+    /// 지정된 줌 레벨을 적용하고, 플레이어 또는 맵 중앙을 기준으로 오프셋을 재조정합니다.
     /// </summary>
-    private void ZoomAroundCenter(bool zoomIn)
+    public void SetZoomLevel(double newZoom)
     {
+        _settings.ZoomLevel = newZoom;
+
         if (_currentMapConfig == null)
         {
-            if (zoomIn)
-                _settings.ZoomIn();
-            else
-                _settings.ZoomOut();
             UpdateMapView();
             return;
         }
@@ -793,26 +790,22 @@ public partial class OverlayMiniMapWindow : Window
         var viewWidth = MapContainer.ActualWidth > 0 ? MapContainer.ActualWidth : ActualWidth;
         var viewHeight = MapContainer.ActualHeight > 0 ? MapContainer.ActualHeight : ActualHeight;
 
-        // 화면 중앙 좌표
-        var centerX = viewWidth / 2;
-        var centerY = viewHeight / 2;
-
-        // 현재 줌에서 화면 중앙이 가리키는 맵 좌표 계산
-        var oldZoom = _settings.ZoomLevel;
-        var mapX = (centerX - _settings.MapOffsetX) / oldZoom;
-        var mapY = (centerY - _settings.MapOffsetY) / oldZoom;
-
-        // 줌 레벨 변경
-        if (zoomIn)
-            _settings.ZoomIn();
+        var position = _trackerService?.LastPosition;
+        if (position != null)
+        {
+            // 플레이어가 탐지된 경우: 플레이어 위치를 중앙으로
+            _settings.MapOffsetX = (viewWidth / 2) - (position.X * newZoom);
+            _settings.MapOffsetY = (viewHeight / 2) - (position.Y * newZoom);
+        }
         else
-            _settings.ZoomOut();
+        {
+            // 플레이어가 탐지되지 않은 경우: 맵 정중앙을 화면 중앙으로
+            var mapCenterX = _currentMapConfig.ImageWidth / 2.0;
+            var mapCenterY = _currentMapConfig.ImageHeight / 2.0;
 
-        var newZoom = _settings.ZoomLevel;
-
-        // 새 줌에서 같은 맵 좌표가 화면 중앙에 오도록 오프셋 조정
-        _settings.MapOffsetX = centerX - (mapX * newZoom);
-        _settings.MapOffsetY = centerY - (mapY * newZoom);
+            _settings.MapOffsetX = (viewWidth / 2) - (mapCenterX * newZoom);
+            _settings.MapOffsetY = (viewHeight / 2) - (mapCenterY * newZoom);
+        }
 
         UpdateMapView();
     }

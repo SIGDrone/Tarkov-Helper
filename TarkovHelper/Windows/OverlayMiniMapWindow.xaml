@@ -51,6 +51,10 @@
 
                 <!-- 플레이어 마커 -->
                 <Canvas x:Name="PlayerMarkerContainer" Visibility="Collapsed">
+                    <Canvas.RenderTransform>
+                        <ScaleTransform x:Name="PlayerMarkerScale" ScaleX="1" ScaleY="1" CenterX="10" CenterY="10"/>
+                    </Canvas.RenderTransform>
+                    
                     <!-- 외곽 원 (테두리) -->
                     <Ellipse x:Name="PlayerOuterCircle"
                              Width="20" Height="20"
@@ -70,7 +74,7 @@
                              Fill="#882196F3"
                              Canvas.Left="5" Canvas.Top="-8">
                         <Polygon.RenderTransform>
-                            <RotateTransform x:Name="PlayerRotation" Angle="0" CenterX="5" CenterY="6"/>
+                            <RotateTransform x:Name="PlayerRotation" Angle="0" CenterX="5" CenterY="18"/>
                         </Polygon.RenderTransform>
                     </Polygon>
                 </Canvas>

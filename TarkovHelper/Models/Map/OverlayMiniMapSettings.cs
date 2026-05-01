@@ -57,6 +57,11 @@ public sealed class OverlayMiniMapSettings
     public double ZoomLevel { get; set; } = 1.0;
 
     /// <summary>
+    /// 플레이어 마커 크기 배율 (0.5 ~ 3.0)
+    /// </summary>
+    public double PlayerMarkerSize { get; set; } = 1.0;
+
+    /// <summary>
     /// 뷰 모드 (고정/플레이어 추적)
     /// </summary>
     public MiniMapViewMode ViewMode { get; set; } = MiniMapViewMode.PlayerTracking;
@@ -143,6 +148,7 @@ public sealed class OverlayMiniMapSettings
         Height = 300;
         Opacity = 0.8;
         ZoomLevel = 1.0;
+        PlayerMarkerSize = 1.0;
         ViewMode = MiniMapViewMode.PlayerTracking;
         ClickThrough = false;
         ShowQuestMarkers = true;
@@ -192,6 +198,7 @@ public sealed class OverlayMiniMapSettings
     {
         Opacity = other.Opacity;
         ZoomLevel = other.ZoomLevel;
+        PlayerMarkerSize = other.PlayerMarkerSize;
         ViewMode = other.ViewMode;
         ClickThrough = other.ClickThrough;
         ShowQuestMarkers = other.ShowQuestMarkers;
@@ -212,6 +219,7 @@ public sealed class OverlayMiniMapSettings
             Height = Height,
             Opacity = Opacity,
             ZoomLevel = ZoomLevel,
+            PlayerMarkerSize = PlayerMarkerSize,
             ViewMode = ViewMode,
             ClickThrough = ClickThrough,
             ShowQuestMarkers = ShowQuestMarkers,
