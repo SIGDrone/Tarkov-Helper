@@ -149,3 +149,6 @@ release_v*/
 
 # Scripts
 publish.ps1
+
+# Antigravity
+brain/
