@@ -469,7 +469,7 @@
                                             <LineBreak/>
                                             <Run Text="[단축키 안내]" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
                                             <LineBreak/>
-                                            <Run Text="• " Foreground="{StaticResource TextSecondaryBrush}"/><Run Text="NumPad +" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/><Run Text=" / " Foreground="{StaticResource TextSecondaryBrush}"/><Run Text="NumPad -" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/><Run Text=" : 미니맵 확대 / 축소" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                            <Run Text="• " Foreground="{StaticResource TextSecondaryBrush}"/><Run Text="NumPad +" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/><Run Text=" / " Foreground="{StaticResource TextSecondaryBrush}"/><Run Text="NumPad -" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/><Run Text=" : 미니맵 확대 / 축소 (오버레이 설정에서 변경 가능)" Foreground="{StaticResource TextSecondaryBrush}"/>
                                             <LineBreak/>
                                             <Run Text="• " Foreground="{StaticResource TextSecondaryBrush}"/><Run Text="Ctrl + L" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/><Run Text=" : 미니맵 설정 창 열기" Foreground="{StaticResource TextSecondaryBrush}"/>
                                         </TextBlock>

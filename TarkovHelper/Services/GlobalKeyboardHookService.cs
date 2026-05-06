@@ -105,6 +105,16 @@ public class GlobalKeyboardHookService : IDisposable
     /// </summary>
     public event Action? OverlayZoomOutPressed;
 
+    /// <summary>
+    /// 설정된 줌 인 단축키 (Virtual Key Code)
+    /// </summary>
+    public int ZoomInKey { get; set; } = 0x6B; // VK_ADD
+
+    /// <summary>
+    /// 설정된 줌 아웃 단축키 (Virtual Key Code)
+    /// </summary>
+    public int ZoomOutKey { get; set; } = 0x6D; // VK_SUBTRACT
+
     #endregion
 
     /// <summary>
@@ -363,19 +373,14 @@ public class GlobalKeyboardHookService : IDisposable
     }
 
     /// <summary>
-    /// Virtual key code를 줌 액션으로 변환 (NumPad +/-)
+    /// Virtual key code를 줌 액션으로 변환 (설정된 단축키 기반)
     /// </summary>
     private Action? GetZoomActionFromVkCode(int vkCode)
     {
-        const int VK_ADD = 0x6B;         // NumPad +
-        const int VK_SUBTRACT = 0x6D;    // NumPad -
-
-        return vkCode switch
-        {
-            VK_ADD => OverlayZoomInPressed,
-            VK_SUBTRACT => OverlayZoomOutPressed,
-            _ => null
-        };
+        if (vkCode == ZoomInKey) return OverlayZoomInPressed;
+        if (vkCode == ZoomOutKey) return OverlayZoomOutPressed;
+        
+        return null;
     }
 
     /// <summary>

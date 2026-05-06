@@ -12,6 +12,9 @@ public partial class OverlaySettingsWindow : Window
     private readonly OverlayMiniMapSettings _settings;
     private readonly OverlayMiniMapWindow? _overlayWindow;
     private bool _isInitializing = true;
+    
+    private enum KeyCaptureMode { None, ZoomIn, ZoomOut }
+    private KeyCaptureMode _captureMode = KeyCaptureMode.None;
 
     /// <summary>
     /// Settings applied event
@@ -41,6 +44,7 @@ public partial class OverlaySettingsWindow : Window
         ChkClickThrough.IsChecked = _settings.ClickThrough;
 
         UpdateDisplays();
+        UpdateKeyDisplays();
     }
 
     private void UpdateDisplays()
@@ -51,6 +55,20 @@ public partial class OverlaySettingsWindow : Window
             TxtZoom.Text = $"{SliderZoom.Value / 100:F2}x";
         if (TxtMarkerSize != null)
             TxtMarkerSize.Text = $"{SliderMarkerSize.Value / 100:F1}x";
+    }
+
+    private void UpdateKeyDisplays()
+    {
+        if (BtnZoomInKey != null)
+        {
+            var key = System.Windows.Input.KeyInterop.KeyFromVirtualKey(_settings.ZoomInKey);
+            BtnZoomInKey.Content = key.ToString();
+        }
+        if (BtnZoomOutKey != null)
+        {
+            var key = System.Windows.Input.KeyInterop.KeyFromVirtualKey(_settings.ZoomOutKey);
+            BtnZoomOutKey.Content = key.ToString();
+        }
     }
 
     private void ApplySettings()
@@ -141,6 +159,58 @@ public partial class OverlaySettingsWindow : Window
     private void BtnClose_Click(object sender, RoutedEventArgs e)
     {
         Close();
+    }
+
+    private void BtnZoomInKey_Click(object sender, RoutedEventArgs e)
+    {
+        _captureMode = KeyCaptureMode.ZoomIn;
+        BtnZoomInKey.Content = "입력 대기...";
+        BtnZoomOutKey.Content = System.Windows.Input.KeyInterop.KeyFromVirtualKey(_settings.ZoomOutKey).ToString();
+        this.Focus();
+    }
+
+    private void BtnZoomOutKey_Click(object sender, RoutedEventArgs e)
+    {
+        _captureMode = KeyCaptureMode.ZoomOut;
+        BtnZoomOutKey.Content = "입력 대기...";
+        BtnZoomInKey.Content = System.Windows.Input.KeyInterop.KeyFromVirtualKey(_settings.ZoomInKey).ToString();
+        this.Focus();
+    }
+
+    protected override void OnPreviewKeyDown(System.Windows.Input.KeyEventArgs e)
+    {
+        if (_captureMode != KeyCaptureMode.None)
+        {
+            e.Handled = true;
+            
+            // ESC키로 취소
+            if (e.Key == System.Windows.Input.Key.Escape)
+            {
+                _captureMode = KeyCaptureMode.None;
+                UpdateKeyDisplays();
+                return;
+            }
+
+            // 시스템 키인 경우 (예: F10 등) ImeProcessed나 System 등을 확인
+            var key = e.Key == System.Windows.Input.Key.System ? e.SystemKey : e.Key;
+            int vk = System.Windows.Input.KeyInterop.VirtualKeyFromKey(key);
+            
+            if (_captureMode == KeyCaptureMode.ZoomIn)
+            {
+                _settings.ZoomInKey = vk;
+            }
+            else if (_captureMode == KeyCaptureMode.ZoomOut)
+            {
+                _settings.ZoomOutKey = vk;
+            }
+
+            _captureMode = KeyCaptureMode.None;
+            UpdateKeyDisplays();
+            ApplySettings();
+            return;
+        }
+
+        base.OnPreviewKeyDown(e);
     }
 
     #endregion

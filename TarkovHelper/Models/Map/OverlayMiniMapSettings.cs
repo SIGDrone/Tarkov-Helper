@@ -72,6 +72,16 @@ public sealed class OverlayMiniMapSettings
     public bool ClickThrough { get; set; } = false;
 
     /// <summary>
+    /// 줌 인 단축키 (Virtual Key Code, 기본값: VK_ADD 0x6B)
+    /// </summary>
+    public int ZoomInKey { get; set; } = 0x6B;
+
+    /// <summary>
+    /// 줌 아웃 단축키 (Virtual Key Code, 기본값: VK_SUBTRACT 0x6D)
+    /// </summary>
+    public int ZoomOutKey { get; set; } = 0x6D;
+
+    /// <summary>
     /// 퀘스트 마커 표시 여부
     /// </summary>
     public bool ShowQuestMarkers { get; set; } = true;
@@ -151,6 +161,8 @@ public sealed class OverlayMiniMapSettings
         PlayerMarkerSize = 1.0;
         ViewMode = MiniMapViewMode.PlayerTracking;
         ClickThrough = false;
+        ZoomInKey = 0x6B;
+        ZoomOutKey = 0x6D;
         ShowQuestMarkers = true;
         ShowExtractMarkers = true;
         MapOffsetX = 0;
@@ -201,6 +213,8 @@ public sealed class OverlayMiniMapSettings
         PlayerMarkerSize = other.PlayerMarkerSize;
         ViewMode = other.ViewMode;
         ClickThrough = other.ClickThrough;
+        ZoomInKey = other.ZoomInKey;
+        ZoomOutKey = other.ZoomOutKey;
         ShowQuestMarkers = other.ShowQuestMarkers;
         ShowExtractMarkers = other.ShowExtractMarkers;
     }
@@ -222,6 +236,8 @@ public sealed class OverlayMiniMapSettings
             PlayerMarkerSize = PlayerMarkerSize,
             ViewMode = ViewMode,
             ClickThrough = ClickThrough,
+            ZoomInKey = ZoomInKey,
+            ZoomOutKey = ZoomOutKey,
             ShowQuestMarkers = ShowQuestMarkers,
             ShowExtractMarkers = ShowExtractMarkers,
             MapOffsetX = MapOffsetX,

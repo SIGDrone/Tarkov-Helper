@@ -157,6 +157,7 @@ public class OverlayMiniMapService : IDisposable
     private void OnOverlaySettingsChanged(OverlayMiniMapSettings settings)
     {
         _settings = settings;
+        SyncHotkeys();
         _ = SaveSettingsAsync();
         SettingsChanged?.Invoke(settings);
     }
@@ -239,6 +240,10 @@ public class OverlayMiniMapService : IDisposable
             _log.Warning($"Failed to load overlay settings: {ex.Message}");
             _settings = new OverlayMiniMapSettings();
         }
+        finally
+        {
+            SyncHotkeys();
+        }
     }
 
     private async Task SaveSettingsAsync()
@@ -317,8 +322,15 @@ public class OverlayMiniMapService : IDisposable
     private void OnSettingsApplied(OverlayMiniMapSettings settings)
     {
         _settings.CopyFrom(settings);
+        SyncHotkeys();
         _ = SaveSettingsAsync();
         SettingsChanged?.Invoke(_settings);
+    }
+
+    private void SyncHotkeys()
+    {
+        GlobalKeyboardHookService.Instance.ZoomInKey = _settings.ZoomInKey;
+        GlobalKeyboardHookService.Instance.ZoomOutKey = _settings.ZoomOutKey;
     }
 
     #endregion

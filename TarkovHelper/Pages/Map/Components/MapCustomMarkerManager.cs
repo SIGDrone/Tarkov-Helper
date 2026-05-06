@@ -61,8 +61,8 @@ public class MapCustomMarkerManager
 
         try
         {
-            var markers = await _userDataDb.LoadCustomMarkersAsync(_currentMapKey).WaitAsync(ct);
             Markers.Clear();
+            var markers = await _userDataDb.LoadCustomMarkersAsync(_currentMapKey).WaitAsync(ct);
             foreach (var m in markers) Markers.Add(m);
             UpdateMarkerDisplay();
         }
@@ -92,8 +92,9 @@ public class MapCustomMarkerManager
         if (string.IsNullOrEmpty(_currentMapKey)) return;
 
         var mapMarkers = Markers.Where(m => 
-            (string.IsNullOrEmpty(m.FloorId) && string.IsNullOrEmpty(_currentFloorId)) || 
-            (m.FloorId == _currentFloorId)
+            m.MapKey == _currentMapKey &&
+            ((string.IsNullOrEmpty(m.FloorId) && string.IsNullOrEmpty(_currentFloorId)) || 
+            (m.FloorId == _currentFloorId))
         ).ToList();
 
         foreach (var marker in mapMarkers)

@@ -149,6 +149,29 @@
                 <TextBlock Text="활성화하면 마우스 클릭이 오버레이를 통과합니다"
                            Foreground="#666666" FontSize="11" Margin="20,0,0,0"/>
 
+                <!-- Hotkeys -->
+                <TextBlock Text="단축키" Style="{StaticResource SectionHeader}"/>
+
+                <Grid Margin="0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="줌 인 단축키" Style="{StaticResource SettingLabel}"/>
+                    <Button x:Name="BtnZoomInKey" Grid.Column="1" Content="NumPad +" Width="80" 
+                            Style="{StaticResource ActionButton}" Padding="4" FontSize="11" Click="BtnZoomInKey_Click"/>
+                </Grid>
+
+                <Grid Margin="0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="줌 아웃 단축키" Style="{StaticResource SettingLabel}"/>
+                    <Button x:Name="BtnZoomOutKey" Grid.Column="1" Content="NumPad -" Width="80" 
+                            Style="{StaticResource ActionButton}" Padding="4" FontSize="11" Click="BtnZoomOutKey_Click"/>
+                </Grid>
+
                 <!-- Actions -->
                 <TextBlock Text="작업" Style="{StaticResource SectionHeader}"/>
 
