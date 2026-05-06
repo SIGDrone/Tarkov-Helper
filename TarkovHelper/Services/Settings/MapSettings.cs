@@ -76,6 +76,7 @@ public class MapSettings
     private const string KeyMapLastTranslateX = "map.lastTranslateX";
     private const string KeyMapLastTranslateY = "map.lastTranslateY";
     private const string KeyMapCustomMarkersPanelCollapsed = "map.customMarkersCollapsed";
+    private const string KeyMapAutoCenterEnabled = "map.autoCenterEnabled";
 
     #endregion
 
@@ -147,6 +148,7 @@ public class MapSettings
     private double? _lastTranslateX;
     private double? _lastTranslateY;
     private bool? _customMarkersPanelCollapsed;
+    private bool? _autoCenterEnabled;
 
     #endregion
 
@@ -774,6 +776,27 @@ public class MapSettings
             {
                 _minimapSize = value;
                 SaveSetting(KeyMapMinimapSize, value ?? "M");
+            }
+        }
+    }
+
+    #endregion
+
+    #region Properties - Tracking
+
+    public bool AutoCenterEnabled
+    {
+        get
+        {
+            EnsureLoaded();
+            return _autoCenterEnabled ?? true;
+        }
+        set
+        {
+            if (_autoCenterEnabled != value)
+            {
+                _autoCenterEnabled = value;
+                SaveSetting(KeyMapAutoCenterEnabled, value.ToString());
             }
         }
     }

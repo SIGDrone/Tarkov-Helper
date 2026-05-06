@@ -64,6 +64,11 @@
                               IsChecked="True"
                               Checked="ChkShowExtractMarkers_Changed"
                               Unchecked="ChkShowExtractMarkers_Changed"/>
+                    <CheckBox x:Name="ChkFixedView" Content="고정 뷰"
+                              Foreground="{StaticResource TextPrimaryBrush}"
+                              VerticalAlignment="Center" Margin="0,0,16,0"
+                              Checked="ChkFixedView_Changed"
+                              Unchecked="ChkFixedView_Changed"/>
                     <Button x:Name="BtnClearTrail" Content="경로 지우기" Padding="12,6"
                             Margin="0,0,8,0" Click="BtnClearTrail_Click"/>
                     <Button x:Name="BtnFullScreen" Content="전체 화면" Padding="12,6"

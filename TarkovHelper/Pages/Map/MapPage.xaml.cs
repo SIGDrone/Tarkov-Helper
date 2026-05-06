@@ -443,6 +443,7 @@ public partial class MapPage : UserControl
         TxtMapLabel.Text = _loc.MapLabel;
         ChkShowQuestMarkers.Content = _loc.QuestMarkers;
         ChkShowExtractMarkers.Content = _loc.Extracts;
+        ChkFixedView.Content = _loc.FixedView;
         BtnClearTrail.Content = _loc.ClearTrail;
         BtnFullScreen.Content = _loc.FullScreen;
         BtnExitFullScreen.Content = _loc.ExitFullScreen;
@@ -603,6 +604,10 @@ public partial class MapPage : UserControl
         // 커스텀 마커 사이드바 접힘 상태 로드
         _isCustomMarkersPanelCollapsed = settingsService.IsCustomMarkersPanelCollapsed;
         UpdateCustomMarkersPanelUI(_isCustomMarkersPanelCollapsed);
+
+        // 자동 중앙 정렬(고정 뷰) 설정 로드
+        if (ChkFixedView != null)
+            ChkFixedView.IsChecked = !MapSettings.Instance.AutoCenterEnabled;
     }
 
     private void LoadMapMarkersSettings()
@@ -711,7 +716,7 @@ public partial class MapPage : UserControl
             TryAutoSwitchFloor(position);
 
             // 자동 중앙 정렬이 활성화되어 있으면 플레이어 위치로 맵 이동
-            if (_trackerService?.Settings.AutoCenterOnPosition == true)
+            if (MapSettings.Instance.AutoCenterEnabled)
             {
                 CenterOnPosition(position);
             }
@@ -1086,6 +1091,19 @@ public partial class MapPage : UserControl
         else
         {
             _trackerService.StartTracking();
+        }
+    }
+
+    private void ChkFixedView_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_isInitializing || ChkFixedView == null) return;
+
+        bool isFixed = ChkFixedView.IsChecked ?? false;
+        MapSettings.Instance.AutoCenterEnabled = !isFixed;
+        
+        if (_trackerService != null)
+        {
+            _trackerService.Settings.AutoCenterOnPosition = !isFixed;
         }
     }
 

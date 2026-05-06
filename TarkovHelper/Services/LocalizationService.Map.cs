@@ -15,6 +15,7 @@ public partial class LocalizationService
     public string QuestMarkers => "퀘스트 마커";
     public string Extracts => "탈출구";
     public string ClearTrail => "경로 지우기";
+    public string FixedView => "고정 뷰";
     public string FullScreen => "전체 화면";
     public string ExitFullScreen => "전체 화면 종료";
     public string StartTracking => "추적 시작";
